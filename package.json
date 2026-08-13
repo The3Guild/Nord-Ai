@@ -1,0 +1,29 @@
+{
+  "name": "nord-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quai-native AI agent trust and economic coordination protocol",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "agents/*"
+  ],
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts",
+    "lint": "hardhat check",
+    "dev:web": "npm run dev -w @nord-ai/web"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "quais": "^1.0.0-alpha.56",
+    "quai-hardhat-plugin": "^1.0.3",
+    "dotenv": "^16.4.5"
+  }
+}
