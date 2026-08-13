@@ -1,0 +1,116 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { Search, Bot, ClipboardList, X, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useChainAgents } from "@/hooks/use-chain-agents";
+import { useTaskHistory } from "@/hooks/use-task-history";
+
+export function GlobalSearch() {
+  const [query,  setQuery]  = useState("");
+  const [open,   setOpen]   = useState(false);
+  const ref  = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { agents } = useChainAgents();
+  const { history } = useTaskHistory();
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const q = query.toLowerCase().trim();
+
+  const matchedAgents = q
+    ? agents.filter(a =>
+        a.name.toLowerCase().includes(q) ||
+        a.type.toLowerCase().includes(q) ||
+        a.skills.some(s => s.toLowerCase().includes(q))
+      ).slice(0, 4)
+    : [];
+
+  const matchedTasks = q
+    ? history.filter(t => t.description.toLowerCase().includes(q)).slice(0, 4)
+    : [];
+
+  const hasResults = matchedAgents.length > 0 || matchedTasks.length > 0;
+
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { setOpen(false); setQuery(""); }
+    if (e.key === "Enter" && q) {
+      router.push(`/agents?q=${encodeURIComponent(q)}`);
+      setOpen(false);
+      setQuery("");
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative flex-1 max-w-sm">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" />
+      <input
+        type="text"
+        value={query}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKey}
+        placeholder="Search agents, tasks..."
+        className="input-base pl-9 pr-8 py-1.5 text-xs"
+      />
+      {query && (
+        <button onClick={() => { setQuery(""); setOpen(false); }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+          <X className="w-3 h-3" />
+        </button>
+      )}
+
+      {open && query && (
+        <div className="absolute top-full mt-2 left-0 right-0 glass-card border border-white/[0.06] rounded-xl overflow-hidden z-50 shadow-2xl shadow-black/50">
+          {!hasResults && (
+            <p className="px-4 py-3 text-xs text-slate-500">No results for &quot;{query}&quot;</p>
+          )}
+
+          {matchedAgents.length > 0 && (
+            <div>
+              <p className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider border-b border-white/[0.04]">Agents</p>
+              {matchedAgents.map(a => (
+                <button key={a.name} onClick={() => { router.push(`/agents?q=${encodeURIComponent(q)}`); setOpen(false); setQuery(""); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.04] transition-colors text-left group">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500/20 to-violet-500/20 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-3.5 h-3.5 text-cyan-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-white truncate group-hover:text-cyan-400 transition-colors">{a.name}</p>
+                    <p className="text-[11px] text-slate-500">{a.type} · {a.price} QUAI</p>
+                  </div>
+                  <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {matchedTasks.length > 0 && (
+            <div className={matchedAgents.length > 0 ? "border-t border-white/[0.04]" : ""}>
+              <p className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider border-b border-white/[0.04]">Tasks</p>
+              {matchedTasks.map(t => (
+                <button key={t.taskId} onClick={() => { router.push("/tasks"); setOpen(false); setQuery(""); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.04] transition-colors text-left group">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <ClipboardList className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-white truncate group-hover:text-cyan-400 transition-colors">{t.description}</p>
+                    <p className="text-[11px] text-slate-500">#{t.taskId} · {t.agentsHired.length} agents</p>
+                  </div>
+                  <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

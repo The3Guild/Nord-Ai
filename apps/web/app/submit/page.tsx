@@ -1,0 +1,257 @@
+"use client";
+
+import { useState } from "react";
+import { CONTRACTS } from "@/lib/constants";
+import { Award, ExternalLink, Copy, CheckCircle, AlertCircle, Send, Users, Github, FileText, Tag, Globe, Loader2 } from "lucide-react";
+
+const TRACKS = [
+  { id: "rwa-oracle", label: "RWA Oracle Agent with Verifiable On-Chain Identity", desc: "AI agent that scrapes off-chain data, runs risk assessment, and posts verified data on-chain via x402" },
+  { id: "autonomous-agent", label: "Autonomous AI Agent", desc: "Fully autonomous agent that performs complex tasks without human intervention" },
+  { id: "defi-agent", label: "DeFi Agent", desc: "Agent that interacts with DeFi protocols for trading, lending, or yield optimization" },
+];
+
+const DEFAULT_PROJECT = {
+  name: "Nord-AI — RWA Oracle Agents with Verifiable On-Chain Identity",
+  desc: `Nord-AI is a decentralized AI agent coordination network with verifiable on-chain identity and reputation, built for the Quai × Blip Buildathon.
+
+AI agents self-register in an on-chain directory, get hired by a coordinator, execute work via Venice AI, settle payments on QUAI Network, and build a verifiable trust score — all without human intervention.
+
+Key features:
+• Three smart contracts (AgentRegistry, AgentReputation, TaskCoordinator) deployed on QUAI Network
+• QUAI-denominated task settlement (verify + settle)
+• 6 specialized Venice AI agent types (research, risk, coding, design, audit, report)
+• Verifiable on-chain reputation scoring with failure penalty weighting
+• Full TypeScript backend coordinator with Express API
+• Next.js frontend with Pelagus wallet integration`,
+  github: "https://github.com/The3Guild/Nord-Ai",
+  track: "rwa-oracle",
+  team: "",
+};
+
+export default function SubmitPage() {
+  const [form, setForm] = useState({ ...DEFAULT_PROJECT });
+  const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  function update(field: string, value: string) {
+    setForm(prev => ({ ...prev, [field]: value }));
+  }
+
+  function buildSubmissionText(): string {
+    return `# ${form.name}
+
+## Track
+${TRACKS.find(t => t.id === form.track)?.label ?? form.track}
+
+## Description
+${form.desc}
+
+## GitHub Repository
+${form.github}
+
+${form.team ? `## Team Members\n${form.team}` : ""}
+
+---
+
+### Smart Contracts (QUAI Network)
+| Contract | Address |
+|---|---|
+| AgentRegistry | \`${CONTRACTS.AGENT_REGISTRY}\` |
+| AgentReputation | \`${CONTRACTS.AGENT_REPUTATION}\` |
+| TaskCoordinator | \`${CONTRACTS.TASK_COORDINATOR}\` |
+
+### Architecture
+- Backend: TypeScript/Express (port 3000)
+- Frontend: Next.js + Pelagus wallet
+- AI: Venice AI (6 agent types)
+- Payments: x402 Facilitator (EIP-712)
+- Blockchain: QUAI Network (Solidity contracts)
+
+### Links
+- Explorer: https://orchard.quaiscan.io
+- Pelagus Wallet: https://pelaguswallet.io/`;
+  }
+
+  async function copySubmission() {
+    const text = buildSubmissionText();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError("");
+    try {
+      // Copy the hackathon submission details to the clipboard
+      await navigator.clipboard.writeText(buildSubmissionText());
+      setSubmitted(true);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Submit to Hackathon</h1>
+          <p className="text-sm text-slate-400 mt-1">Submit Nord-AI to the Quai × Blip Buildathon.</p>
+        </div>
+        {submitted && (
+          <span className="tag tag-green flex items-center gap-1.5">
+            <CheckCircle className="w-3 h-3" /> Submission Ready
+          </span>
+        )}
+      </div>
+
+      {/* Progress steps */}
+      <div className="glass-card p-4">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-500">
+          <span className="flex items-center gap-1 sm:gap-1.5">
+            <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-semibold text-[10px] sm:text-xs">1</span>
+            Fill details
+          </span>
+          <span className="text-slate-700 hidden sm:inline">——</span>
+          <span className="flex items-center gap-1 sm:gap-1.5">
+            <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/[0.05] border border-white/[0.1] flex items-center justify-center text-slate-500 font-semibold text-[10px] sm:text-xs">2</span>
+            Review
+          </span>
+          <span className="text-slate-700 hidden sm:inline">——</span>
+          <span className="flex items-center gap-1 sm:gap-1.5">
+            <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/[0.05] border border-white/[0.1] flex items-center justify-center text-slate-500 font-semibold text-[10px] sm:text-xs">3</span>
+            Submit
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Form */}
+        <div className="lg:col-span-3 glass-card p-4 sm:p-6 space-y-4 sm:space-y-5">
+
+          {/* Project Name */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block flex items-center gap-1.5">
+              <Award className="w-3 h-3" /> Project Name
+            </label>
+            <input value={form.name} onChange={e => update("name", e.target.value)}
+              className="input-base px-3 py-2 text-sm" />
+          </div>
+
+          {/* Track */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block flex items-center gap-1.5">
+              <Tag className="w-3 h-3" /> Track
+            </label>
+            <div className="space-y-2">
+              {TRACKS.map(t => (
+                <button key={t.id} onClick={() => update("track", t.id)}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${form.track === t.id
+                    ? "border-cyan-500/40 bg-cyan-500/10"
+                    : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
+                  }`}>
+                  <p className="text-sm font-medium text-white">{t.label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{t.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block flex items-center gap-1.5">
+              <FileText className="w-3 h-3" /> Description
+            </label>
+            <textarea value={form.desc} onChange={e => update("desc", e.target.value)}
+              rows={10} className="input-base px-3 py-2 text-sm resize-y" />
+          </div>
+
+          {/* GitHub */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block flex items-center gap-1.5">
+              <Github className="w-3 h-3" /> GitHub Repository
+            </label>
+            <input value={form.github} onChange={e => update("github", e.target.value)}
+              className="input-base px-3 py-2 text-sm font-mono" />
+          </div>
+
+          {/* Team */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1.5 block flex items-center gap-1.5">
+              <Users className="w-3 h-3" /> Team Members
+            </label>
+            <textarea value={form.team} onChange={e => update("team", e.target.value)}
+              placeholder="Name 1 — Role&#10;Name 2 — Role&#10;..."
+              rows={3} className="input-base px-3 py-2 text-sm resize-y" />
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button onClick={handleSubmit} disabled={submitting || !form.name || !form.desc}
+              className="btn-primary flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {submitting ? "Preparing..." : "Prepare Submission"}
+            </button>
+            <button onClick={copySubmission} className="btn-ghost flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm">
+              {copied ? <><CheckCircle className="w-4 h-4 text-green-400" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy Details</>}
+            </button>
+          </div>
+
+          {/* Success message */}
+          {submitted && (
+            <div className="flex items-start gap-3 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+              <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-400">Submission details copied to clipboard!</p>
+                <p className="text-xs text-slate-500 mt-1">Paste the details into the Quai × Blip Buildathon submission form to complete your entry.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+              <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar - Preview + Info */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Submission preview */}
+          <div className="glass-card p-5">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <FileText className="w-3 h-3" /> Submission Preview
+            </h2>
+            <pre className="text-[10px] sm:text-xs text-green-300/80 bg-black/40 rounded-xl p-3 sm:p-4 overflow-x-auto whitespace-pre-wrap max-h-72 sm:max-h-96 overflow-y-auto">
+              {buildSubmissionText().slice(0, 600)}{buildSubmissionText().length > 600 ? "..." : ""}
+            </pre>
+          </div>
+
+          {/* Quick links */}
+          <div className="glass-card p-5 space-y-3">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quick Links</h2>
+            <a href="https://github.com/The3Guild/Nord-Ai" target="_blank" rel="noreferrer"
+              className="flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-400 transition-colors">
+              <Github className="w-3.5 h-3.5" /> GitHub Repository <ExternalLink className="w-3 h-3 ml-auto" />
+            </a>
+            <a href="https://quaiscan.io" target="_blank" rel="noreferrer"
+              className="flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-400 transition-colors">
+              <Globe className="w-3.5 h-3.5" /> QUAI Network <ExternalLink className="w-3 h-3 ml-auto" />
+            </a>
+            <a href={`https://orchard.quaiscan.io/contract/${CONTRACTS.AGENT_REGISTRY}`} target="_blank" rel="noreferrer"
+              className="flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-400 transition-colors">
+              <ExternalLink className="w-3.5 h-3.5" /> AgentRegistry Explorer <ExternalLink className="w-3 h-3 ml-auto" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

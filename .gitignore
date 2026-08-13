@@ -8,3 +8,5 @@ typechain-types/
 .env.local
 dist/
 .DS_Store
+.next/
+*.tsbuildinfo
