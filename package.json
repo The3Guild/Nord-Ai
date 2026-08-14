@@ -10,6 +10,9 @@
   ],
   "scripts": {
     "compile": "hardhat compile",
+    "forge:build": "forge build",
+    "forge:test": "forge test",
+    "forge:script": "forge script script/DeployNordAi.s.sol:DeployNordAi",
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.ts",
     "lint": "hardhat check",
