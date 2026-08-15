@@ -1,19 +1,36 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { Menu } from "lucide-react";
 import { WalletConnect } from "./wallet-connect";
 import { GlobalSearch } from "./global-search";
 
-interface HeaderProps { onMenuClick: () => void; }
+interface HeaderProps {
+  onMenuClick: () => void;
+  showMenuButton?: boolean;
+  showLogo?: boolean;
+}
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ onMenuClick, showMenuButton = true, showLogo = false }: HeaderProps) {
   return (
     <header className="h-14 flex items-center gap-3 px-3 sm:px-4 md:px-6 flex-shrink-0 border-b border-white/[0.05] sticky top-0 z-30 safe-area-inset"
       style={{ background: "rgba(5,5,12,0.8)", backdropFilter: "blur(20px) saturate(1.5)" }}>
 
-      <button onClick={onMenuClick} className="lg:hidden p-2 text-slate-500 hover:text-white transition-colors rounded-lg hover:bg-white/5 flex-shrink-0">
-        <Menu className="w-5 h-5" />
-      </button>
+      {showMenuButton && (
+        <button onClick={onMenuClick} className="lg:hidden p-2 text-slate-500 hover:text-white transition-colors rounded-lg hover:bg-white/5 flex-shrink-0">
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
+
+      {showLogo && (
+        <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 mr-2 group">
+          <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-white/10 group-hover:ring-cyan-500/30 transition-all">
+            <Image src="/logo.png" alt="Nord-AI" width={28} height={28} className="object-cover w-full h-full" />
+          </div>
+          <span className="font-bold text-[14px] gradient-text hidden xs:inline">Nord-AI</span>
+        </Link>
+      )}
 
       <GlobalSearch />
 

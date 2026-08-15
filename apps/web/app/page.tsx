@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import { Footer } from "@/components/layout/footer";
 import {
   ArrowRight, Sparkles, Zap, Shield, Globe, Bot, Brain,
   Code2, Palette, FileSearch, FileText, AlertTriangle,
@@ -134,7 +135,7 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: Shield,  title: "On-Chain Identity",  desc: "Verifiable agent registration and reputation on QUAI Network. Every action is auditable.", color: "cyan",   gradient: "from-cyan-500/20 to-cyan-500/5"   },
+  { icon: Shield,  title: "On-Chain Identity",  desc: "Verifiable agent registration and reputation on Quai Network. Every action is auditable.", color: "cyan",   gradient: "from-cyan-500/20 to-cyan-500/5"   },
   { icon: Zap,     title: "x402 Micropayments",  desc: "Real EIP-712 payment authorization with QUAI-denominated settlement. True micropayments.",   color: "violet", gradient: "from-violet-500/20 to-violet-500/5" },
   { icon: Globe,   title: "A2A Protocol",         desc: "Coordinator POSTs work to agent endpoints. Real agent-to-agent HTTP communication.",           color: "pink",   gradient: "from-pink-500/20 to-pink-500/5"    },
 ];
@@ -146,9 +147,13 @@ const STATS = [
   { value: "30",   label: "On-Chain Tests",     suffix: "+" },
 ];
 
+import { useWallet } from "@/hooks/use-wallet";
+import { Wallet } from "lucide-react";
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const { connected, connect } = useWallet();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -210,7 +215,7 @@ export default function HomePage() {
             style={{ animationDelay: "200ms" }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Live on QUAI Network
+            Live on Quai Network
           </span>
 
           {/* Heading */}
@@ -238,18 +243,37 @@ export default function HomePage() {
             className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto animate-[slide-up_0.6s_ease_both]"
             style={{ animationDelay: "500ms" }}
           >
-            <Link
-              href="/tasks"
-              className="btn-primary flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl shadow-lg shadow-cyan-500/15 w-full sm:w-auto text-sm font-semibold"
-            >
-              <Sparkles className="w-4 h-4" /> Start a Task
-            </Link>
-            <Link
-              href="/agents"
-              className="btn-ghost flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl w-full sm:w-auto text-sm font-medium"
-            >
-              Browse Agents <ArrowRight className="w-4 h-4" />
-            </Link>
+            {connected ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="btn-primary flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl shadow-lg shadow-cyan-500/15 w-full sm:w-auto text-sm font-semibold"
+                >
+                  <Sparkles className="w-4 h-4" /> Enter Dashboard
+                </Link>
+                <Link
+                  href="/tasks"
+                  className="btn-ghost flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl w-full sm:w-auto text-sm font-medium"
+                >
+                  Create Task <ArrowRight className="w-4 h-4" />
+                </Link>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={connect}
+                  className="btn-primary flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl shadow-lg shadow-cyan-500/15 w-full sm:w-auto text-sm font-semibold"
+                >
+                  <Wallet className="w-4 h-4" /> Connect Wallet to Enter
+                </button>
+                <button
+                  onClick={connect}
+                  className="btn-ghost flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl w-full sm:w-auto text-sm font-medium"
+                >
+                  Launch App <ArrowRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
 
           {/* Trusted by line */}
@@ -259,17 +283,17 @@ export default function HomePage() {
           >
             <div className="flex items-center gap-2 text-[11px] text-slate-600">
               <Terminal className="w-3 h-3" />
-              <span>3 Odra contracts</span>
+              <span>5 Solidity contracts</span>
             </div>
             <div className="w-px h-3 bg-white/[0.06]" />
             <div className="flex items-center gap-2 text-[11px] text-slate-600">
               <Coins className="w-3 h-3" />
-              <span>x402 payments</span>
+              <span>QUAI payments</span>
             </div>
             <div className="w-px h-3 bg-white/[0.06]" />
             <div className="flex items-center gap-2 text-[11px] text-slate-600">
               <Layers className="w-3 h-3" />
-              <span>A2A protocol</span>
+              <span>Zone-aware routing</span>
             </div>
           </div>
         </div>
@@ -430,7 +454,7 @@ export default function HomePage() {
                   <span className="text-slate-500">,</span>
                 </div>
                 <div className="pl-4">
-                  <span className="text-cyan-400">&quot;budgetCSPR&quot;</span>
+                  <span className="text-cyan-400">&quot;budgetQUAI&quot;</span>
                   <span className="text-slate-500">: </span>
                   <span className="text-amber-400">&quot;4&quot;</span>
                 </div>
@@ -447,33 +471,9 @@ export default function HomePage() {
         </section>
       </Reveal>
 
-      {/* ── Bottom CTA ───────────────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────────────── */}
       <Reveal>
-        <section className="px-4 sm:px-5 pb-16 sm:pb-28">
-          <div className="max-w-lg mx-auto">
-            <div className="glass-card p-6 sm:p-10 text-center space-y-4 sm:space-y-5 relative overflow-hidden group">
-              {/* Background glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.04] via-transparent to-violet-500/[0.04] pointer-events-none group-hover:from-cyan-500/[0.06] group-hover:to-violet-500/[0.06] transition-all duration-700" />
-              <div className="absolute -inset-px rounded-[inherit] bg-gradient-to-br from-cyan-500/10 via-transparent to-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-              <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/15 to-violet-500/15 border border-cyan-500/15 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
-                <Bot className="w-5 h-5 text-cyan-400" />
-              </div>
-              <div className="relative">
-                <h2 className="text-lg font-bold text-white">Ready to try it?</h2>
-                <p className="text-sm text-slate-500 mt-1.5">
-                  No setup required. Create your first task in 30 seconds.
-                </p>
-              </div>
-              <Link
-                href="/tasks"
-                className="relative btn-primary inline-flex items-center gap-2.5 px-7 py-3 rounded-xl shadow-lg shadow-cyan-500/15 text-sm font-semibold"
-              >
-                <Sparkles className="w-4 h-4" /> Create your first task
-              </Link>
-            </div>
-          </div>
-        </section>
+        <Footer />
       </Reveal>
     </div>
   );
