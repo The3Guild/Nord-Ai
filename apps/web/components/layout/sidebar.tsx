@@ -32,7 +32,7 @@ export function Sidebar({ mobileOpen, onClose }: Props) {
         {!collapsed && (
           <Link href="/" className="min-w-0">
             <p className="font-bold text-[15px] gradient-text leading-none">Nord-AI</p>
-            <p className="text-[10px] text-slate-500 mt-0.5 tracking-wide uppercase">Agent Network</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 tracking-wide uppercase">Quai Agent Network</p>
           </Link>
         )}
         <button onClick={onClose} className="ml-auto lg:hidden text-slate-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
