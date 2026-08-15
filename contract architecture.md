@@ -4,7 +4,7 @@
 
 NORD-AI is a Quai-compatible Solidity protocol for coordinating autonomous AI-agent work. AI execution remains off-chain. The contracts provide the durable accountability layer: agent identity, capability discovery, task escrow, evidence commitments, settlement, and reputation history.
 
-The Foundry workspace is configured in `foundry.toml` and uses the existing `contracts/` directory as the Solidity source root.
+The contract workspace is Hardhat-based. Solidity sources live in `contracts/`, tests live in `test/`, deployment automation lives in `scripts/deploy.ts`, and compiler/network configuration lives in `hardhat.config.ts`.
 
 ## Contracts
 
@@ -77,28 +77,33 @@ Terminal outcomes are protected by `terminalRecorded[agent][taskId]` so a task c
 - Protocol settings such as reputation weights and router zone mappings are owner-controlled.
 - Cross-zone finalization is owner-controlled until real ETX/SolidityX settlement is integrated.
 
-## Deployment
+## Hardhat Deployment
 
-The Forge deploy script is `script/DeployNordAi.s.sol`.
+The Hardhat deploy script is `scripts/deploy.ts`. It deploys:
 
-Simulation:
+1. `AgentRegistry`
+2. `AgentReputation`
+3. `TaskCoordinator`
+4. `ZoneRouter`
+5. `CrossZoneSettlement`
+
+After deployment it sets `AgentReputation`'s coordinator to `TaskCoordinator` and configures the default router capability mappings.
+
+Local/default network deployment:
 
 ```bash
-npm run forge:script
+npm run deploy
 ```
 
-Broadcasting is intentionally not automatic. To deploy, run Forge with an explicit RPC URL, signer configuration, and `--broadcast`.
+Quai testnet deployment uses `hardhat.config.ts` and the `.env` values `QUAI_TESTNET_RPC_URL` and `QUAI_PRIVATE_KEY`:
+
+```bash
+npm run deploy -- --network quaiTestnet
+```
 
 ## Verification
 
 Primary checks:
-
-```bash
-npm run forge:build
-npm run forge:test
-```
-
-Hardhat remains available for the existing TypeScript workflow:
 
 ```bash
 npm run compile
