@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract AgentRegistry {
+import "./utils/OwnableLite.sol";
+
+contract AgentRegistry is OwnableLite {
     enum Zone {
         Research,
         Rwa,
@@ -22,12 +24,15 @@ contract AgentRegistry {
 
     mapping(address => Agent) private agents;
     address[] private agentAddresses;
+    mapping(address => uint256) private agentIndexPlusOne;
 
     event AgentRegistered(address indexed agent, address owner, string metadataURI, Zone zone);
     event AgentUpdated(address indexed agent, string metadataURI, uint256 price);
     event CapabilitiesSet(address indexed agent, string[] capabilities);
     event AgentDeactivated(address indexed agent);
     event AgentReactivated(address indexed agent);
+
+    constructor() OwnableLite(msg.sender) {}
 
     function registerAgent(
         address _agent,
@@ -36,7 +41,9 @@ contract AgentRegistry {
         uint256 _price,
         Zone _zone
     ) external {
+        require(_agent != address(0), "Agent required");
         require(agents[_agent].owner == address(0), "Agent already registered");
+        require(bytes(_metadataURI).length > 0, "Metadata required");
         require(_capabilities.length > 0, "At least one capability required");
 
         Agent storage agent = agents[_agent];
@@ -46,10 +53,9 @@ contract AgentRegistry {
         agent.zone = _zone;
         agent.reputationRef = 0;
         agent.active = true;
-        for (uint256 i = 0; i < _capabilities.length; i++) {
-            agent.capabilities.push(_capabilities[i]);
-        }
+        _writeCapabilities(agent, _capabilities);
         agentAddresses.push(_agent);
+        agentIndexPlusOne[_agent] = agentAddresses.length;
 
         emit AgentRegistered(_agent, msg.sender, _metadataURI, _zone);
     }
@@ -61,6 +67,7 @@ contract AgentRegistry {
     ) external {
         Agent storage agent = agents[_agent];
         require(agent.owner == msg.sender, "Not agent owner");
+        require(bytes(_metadataURI).length > 0, "Metadata required");
         agent.metadataURI = _metadataURI;
         agent.price = _price;
 
@@ -72,9 +79,7 @@ contract AgentRegistry {
         require(agent.owner == msg.sender, "Not agent owner");
         require(_capabilities.length > 0, "At least one capability required");
         delete agent.capabilities;
-        for (uint256 i = 0; i < _capabilities.length; i++) {
-            agent.capabilities.push(_capabilities[i]);
-        }
+        _writeCapabilities(agent, _capabilities);
 
         emit CapabilitiesSet(_agent, _capabilities);
     }
@@ -121,6 +126,11 @@ contract AgentRegistry {
         return agentAddresses[_index];
     }
 
+    function getAgentIndex(address _agent) external view returns (uint256) {
+        require(agentIndexPlusOne[_agent] != 0, "Agent not registered");
+        return agentIndexPlusOne[_agent] - 1;
+    }
+
     function hasCapability(address _agent, string calldata _capability) external view returns (bool) {
         string[] storage capabilities = agents[_agent].capabilities;
         for (uint256 i = 0; i < capabilities.length; i++) {
@@ -129,5 +139,18 @@ contract AgentRegistry {
             }
         }
         return false;
+    }
+
+    function _writeCapabilities(Agent storage agent, string[] calldata _capabilities) private {
+        for (uint256 i = 0; i < _capabilities.length; i++) {
+            require(bytes(_capabilities[i]).length > 0, "Capability required");
+            for (uint256 j = 0; j < i; j++) {
+                require(
+                    keccak256(bytes(_capabilities[i])) != keccak256(bytes(_capabilities[j])),
+                    "Duplicate capability"
+                );
+            }
+            agent.capabilities.push(_capabilities[i]);
+        }
     }
 }

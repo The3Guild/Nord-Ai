@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract AgentReputation {
+import "./utils/OwnableLite.sol";
+
+contract AgentReputation is OwnableLite {
     enum Outcome {
         Success,
         Failure,
@@ -20,8 +22,9 @@ contract AgentReputation {
     mapping(address => uint256) private completedTasks;
     mapping(address => uint256) private failedTasks;
     mapping(address => ReputationEvent[]) private history;
+    mapping(address => mapping(uint256 => bool)) private terminalRecorded;
 
-    address private coordinator;
+    address public coordinator;
 
     event ReputationUpdated(address indexed agent, uint256 newScore, Outcome outcome, uint256 taskId);
     event ReputationEventRecorded(address indexed agent, uint256 taskId, Outcome outcome, uint256 weight);
@@ -32,21 +35,22 @@ contract AgentReputation {
         _;
     }
 
-    constructor() {
-        coordinator = msg.sender;
-    }
+    constructor() OwnableLite(msg.sender) {}
 
-    function setCoordinator(address _coordinator) external onlyCoordinator {
+    function setCoordinator(address _coordinator) external onlyOwner {
+        require(_coordinator != address(0), "Coordinator required");
         coordinator = _coordinator;
         emit CoordinatorSet(_coordinator);
     }
 
     function recordSuccess(address _agent, uint256 _taskId, uint256 _weight) external onlyCoordinator {
+        _markTerminal(_agent, _taskId);
         _recordEvent(_agent, _taskId, Outcome.Success, _weight);
         completedTasks[_agent] += 1;
     }
 
     function recordFailure(address _agent, uint256 _taskId, uint256 _weight) external onlyCoordinator {
+        _markTerminal(_agent, _taskId);
         _recordEvent(_agent, _taskId, Outcome.Failure, _weight);
         failedTasks[_agent] += 1;
     }
@@ -59,6 +63,7 @@ contract AgentReputation {
         external
         onlyCoordinator
     {
+        _markTerminal(_agent, _taskId);
         _recordEvent(_agent, _taskId, Outcome.DisputeResolved, _weight);
         if (_agentFaulted) {
             failedTasks[_agent] += 1;
@@ -67,12 +72,19 @@ contract AgentReputation {
         }
     }
 
+    function _markTerminal(address _agent, uint256 _taskId) private {
+        require(_agent != address(0), "Agent required");
+        require(!terminalRecorded[_agent][_taskId], "Outcome already recorded");
+        terminalRecorded[_agent][_taskId] = true;
+    }
+
     function _recordEvent(
         address _agent,
         uint256 _taskId,
         Outcome _outcome,
         uint256 _weight
     ) private {
+        require(_agent != address(0), "Agent required");
         int256 delta = _scoreDelta(_outcome, _weight);
         int256 current = int256(reputation[_agent]);
         int256 next = current + delta < 0 ? int256(0) : current + delta;
@@ -110,5 +122,9 @@ contract AgentReputation {
 
     function getFailedTasks(address _agent) external view returns (uint256) {
         return failedTasks[_agent];
+    }
+
+    function isTerminalOutcomeRecorded(address _agent, uint256 _taskId) external view returns (bool) {
+        return terminalRecorded[_agent][_taskId];
     }
 }

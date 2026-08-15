@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 async function deployNORD() {
-  const [deployer, requester, agentWallet] = await ethers.getSigners();
+  const [deployer, requester, agentWallet, otherAgentWallet] = await ethers.getSigners();
 
   const registry = await ethers.deployContract("AgentRegistry");
   await registry.waitForDeployment();
@@ -21,6 +21,8 @@ async function deployNORD() {
 
   const router = await ethers.deployContract("ZoneRouter", [await registry.getAddress()]);
   await router.waitForDeployment();
+  await router.setZoneForCapability("rwa-research", 1);
+  await router.setZoneForCapability("risk-analysis", 2);
 
   const settlement = await ethers.deployContract("CrossZoneSettlement", [
     await coordinator.getAddress(),
@@ -31,6 +33,7 @@ async function deployNORD() {
     deployer,
     requester,
     agentWallet,
+    otherAgentWallet,
     registry,
     reputation,
     coordinator,
@@ -75,6 +78,7 @@ describe("NORD-AI protocol", function () {
     await coordinator.connect(requester).createTask("rwa-research", budget, 1, { value: budget });
     await coordinator.connect(requester).routeTask(taskId);
     await coordinator.connect(requester).assignAgent(taskId, await agentWallet.getAddress());
+    await coordinator.connect(agentWallet).acceptAssignment(taskId);
 
     const resultHash = ethers.keccak256(ethers.toUtf8Bytes("RWA analysis report"));
     await coordinator.connect(agentWallet).submitEvidence(taskId, resultHash);
@@ -85,6 +89,7 @@ describe("NORD-AI protocol", function () {
     const agentBalanceAfter = await ethers.provider.getBalance(await agentWallet.getAddress());
 
     expect(agentBalanceAfter - agentBalanceBefore).to.equal(budget);
+    expect(await coordinator.getTaskStatus(taskId)).to.equal(8);
     expect(await reputation.getCompletedTasks(await agentWallet.getAddress())).to.equal(1);
     expect(await reputation.getReputation(await agentWallet.getAddress())).to.equal(10);
   });
@@ -115,5 +120,74 @@ describe("NORD-AI protocol", function () {
     expect(refundDelta).to.be.lessThanOrEqual(budget);
     expect(await reputation.getFailedTasks(await agentWallet.getAddress())).to.equal(1);
     expect(await reputation.getReputation(await agentWallet.getAddress())).to.equal(0);
+  });
+
+  it("cancels an assigned task before execution without penalizing reputation", async function () {
+    const { requester, agentWallet, registry, coordinator, reputation } = await loadFixture(deployNORD);
+
+    await registry.registerAgent(
+      await agentWallet.getAddress(),
+      "ipfs://nord-ai-rwa-agent",
+      ["rwa-research"],
+      100,
+      1,
+    );
+
+    const budget = ethers.parseEther("0.25");
+    const taskId = await coordinator.getTaskCount();
+    await coordinator.connect(requester).createTask("rwa-research", budget, 1, { value: budget });
+    await coordinator.connect(requester).routeTask(taskId);
+    await coordinator.connect(requester).assignAgent(taskId, await agentWallet.getAddress());
+
+    const requesterBalanceBefore = await ethers.provider.getBalance(await requester.getAddress());
+    await coordinator.connect(requester).cancelTask(taskId);
+    const requesterBalanceAfter = await ethers.provider.getBalance(await requester.getAddress());
+    const refundDelta = requesterBalanceAfter - requesterBalanceBefore;
+
+    expect(refundDelta).to.be.greaterThan(ethers.parseEther("0.249"));
+    expect(refundDelta).to.be.lessThanOrEqual(budget);
+    expect(await coordinator.getTaskStatus(taskId)).to.equal(12);
+    expect(await reputation.getFailedTasks(await agentWallet.getAddress())).to.equal(0);
+  });
+
+  it("rejects agent assignment when capability matches but zone does not", async function () {
+    const { requester, agentWallet, registry, coordinator } = await loadFixture(deployNORD);
+
+    await registry.registerAgent(
+      await agentWallet.getAddress(),
+      "ipfs://nord-ai-research-agent",
+      ["rwa-research"],
+      100,
+      0,
+    );
+
+    const budget = ethers.parseEther("1.0");
+    const taskId = await coordinator.getTaskCount();
+    await coordinator.connect(requester).createTask("rwa-research", budget, 1, { value: budget });
+    await coordinator.connect(requester).routeTask(taskId);
+
+    await expect(
+      coordinator.connect(requester).assignAgent(taskId, await agentWallet.getAddress()),
+    ).to.be.revertedWith("Agent zone mismatch");
+  });
+
+  it("indexes routeable agents through the Hardhat-deployed router", async function () {
+    const { deployer, agentWallet, registry, router } = await loadFixture(deployNORD);
+
+    await registry.registerAgent(
+      await agentWallet.getAddress(),
+      "ipfs://nord-ai-rwa-agent",
+      ["rwa-research"],
+      100,
+      1,
+    );
+
+    await router.registerZoneAgent("rwa-research", await agentWallet.getAddress());
+
+    expect(await router.getZoneForCapability("rwa-research")).to.equal(1);
+    expect(await router.getZoneAgentCount("rwa-research")).to.equal(1);
+
+    const agent = await registry.getAgent(await agentWallet.getAddress());
+    expect(agent.owner).to.equal(await deployer.getAddress());
   });
 });

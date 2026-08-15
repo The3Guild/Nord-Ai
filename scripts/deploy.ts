@@ -26,7 +26,15 @@ async function main() {
 
   const router = await ethers.deployContract("ZoneRouter", [await registry.getAddress()]);
   await router.waitForDeployment();
-  console.log("ZoneRouter deployed at:", await router.getAddress());
+  const routerAddress = await router.getAddress();
+  console.log("ZoneRouter deployed at:", routerAddress);
+
+  await router.setZoneForCapability("web-research", 0);
+  await router.setZoneForCapability("rwa-research", 1);
+  await router.setZoneForCapability("risk-analysis", 2);
+  await router.setZoneForCapability("audit", 3);
+  await router.setZoneForCapability("automation", 4);
+  console.log("ZoneRouter default capability mappings configured");
 
   const settlement = await ethers.deployContract("CrossZoneSettlement", [coordinatorAddress]);
   await settlement.waitForDeployment();
