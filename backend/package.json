@@ -1,0 +1,39 @@
+{
+  "name": "nord-ai-backend",
+  "version": "1.0.0",
+  "description": "NORD-AI coordinator backend — orchestrates AI agents on Quai Network with QUAI settlement",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/server.js",
+    "dev": "ts-node-dev --respawn src/server.ts",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mcp": "npx tsx src/mcp/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "axios": "1.7.2",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.19.2",
+    "express-rate-limit": "7.3.1",
+    "quais": "1.0.0-alpha.56",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/cors": "2.8.17",
+    "@types/express": "4.17.21",
+    "@types/node": "20.14.9",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.4",
+    "ts-node-dev": "2.0.0",
+    "typescript": "5.5.3",
+    "vitest": "^4.1.10"
+  }
+}
