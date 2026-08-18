@@ -55,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <h2 className="text-xl font-bold text-white">Wallet Connection Required</h2>
           <p className="text-sm text-slate-400">
-            You must connect your Casper wallet to access Nord-AI app features and dashboard.
+            You must connect your Pelagus wallet to access Nord-AI app features and dashboard.
           </p>
           <button
             onClick={connect}

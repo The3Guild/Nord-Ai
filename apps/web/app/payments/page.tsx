@@ -23,7 +23,7 @@ export default function PaymentsPage() {
   const [error, setError]               = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/x402/history`)
+    fetch(`${BACKEND_URL}/settlements`)
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then(data => setSettlements(data.settlements ?? []))
       .catch(e => setError(e.message))
@@ -32,7 +32,7 @@ export default function PaymentsPage() {
 
   const totalOut = settlements
     .filter(s => !address || s.from.toLowerCase() === address.toLowerCase())
-    .reduce((s, x) => s + (parseFloat(x.amount || "0") / 1e9), 0);
+    .reduce((s, x) => s + (parseFloat(x.amount || "0") / 1e18), 0);
 
   const uniqueAgents = new Set(settlements.map(s => s.to)).size;
 
@@ -103,7 +103,7 @@ export default function PaymentsPage() {
               <h2 className="text-sm font-semibold text-white mb-2">Settled Payments</h2>
               {settlements.map(s => {
                 const isPayer = address && s.from.toLowerCase() === address.toLowerCase();
-                const amountQUAI = (parseFloat(s.amount || "0") / 1e9).toFixed(2);
+                const amountQUAI = (parseFloat(s.amount || "0") / 1e18).toFixed(2);
                 return (
                   <div key={s.hash} className="glass-card px-2.5 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 hover:bg-white/[0.03] transition-colors">
                     <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isPayer ? "bg-red-500/8" : "bg-green-500/8"}`}>

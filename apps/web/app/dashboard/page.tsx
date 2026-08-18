@@ -41,11 +41,11 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/x402/history`)
+    fetch(`${BACKEND_URL}/settlements`)
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then((data: { settlements?: Settlement[] }) => {
         const settlements = data.settlements ?? [];
-        const total = settlements.reduce((s, x) => s + (parseFloat(x.amount || "0") / 1e9), 0);
+        const total = settlements.reduce((s, x) => s + (parseFloat(x.amount || "0") / 1e18), 0);
         setTotalSpentQUAI(total);
         setSettlementCount(settlements.length);
       })

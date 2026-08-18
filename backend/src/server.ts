@@ -310,6 +310,85 @@ app.post("/agent/deactivate", limiter, async (req: Request, res: Response, next:
 });
 
 /**
+ * POST /agent/register/prepare
+ * Step 1: Validate inputs and return unsigned transaction data for the frontend.
+ * The frontend then sends this via the user's Pelagus wallet.
+ */
+app.post("/agent/register/prepare", limiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { wallet: userAddress, endpoint, capability, price, mode } = req.body as {
+      wallet: string; endpoint: string; capability: string; price?: string; mode?: string;
+    };
+
+    if (!userAddress?.trim()) { res.status(400).json({ error: "wallet address is required" }); return; }
+    if (mode !== "deactivate" && !endpoint?.trim()) { res.status(400).json({ error: "endpoint is required" }); return; }
+    if (!capability?.trim()) { res.status(400).json({ error: "capability is required" }); return; }
+
+    const priceWei = price ? quais.parseQuai(price) : quais.parseQuai("0.0005");
+    const zoneMap: Record<string, number> = {
+      research: 0, rwa: 1, risk: 2, audit: 3, coding: 4, design: 4, report: 3,
+    };
+    const zoneIndex = zoneMap[capability] ?? 0;
+
+    if (mode === "deactivate") {
+      const agentRegistry = new quais.Contract(
+        config.contracts.agentRegistry,
+        ["function deactivate(address _agent)"],
+        getProvider(),
+      );
+      const txData = await agentRegistry.deactivate.populateTransaction(userAddress);
+      res.json({ txData, to: config.contracts.agentRegistry, mode: "deactivate" });
+      return;
+    }
+
+    const agentRegistry = new quais.Contract(
+      config.contracts.agentRegistry,
+      ["function registerAgent(address _agent, string _metadataURI, string[] _capabilities, uint256 _price, uint256 _zone)"],
+      getProvider(),
+    );
+    const txData = await agentRegistry.registerAgent.populateTransaction(
+      userAddress, endpoint, [capability], priceWei, zoneIndex,
+    );
+    res.json({ txData, to: config.contracts.agentRegistry, mode: "register" });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /agent/register/submit
+ * Step 2: Frontend sends the signed transaction hash back.
+ * We store the agent locally and return confirmation.
+ */
+app.post("/agent/register/submit", limiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { txHash, endpoint, capability, price, wallet: userAddress, mode } = req.body as {
+      txHash: string; endpoint?: string; capability?: string; price?: string; wallet?: string; mode?: string;
+    };
+
+    if (!txHash?.trim()) { res.status(400).json({ error: "txHash is required" }); return; }
+
+    if (mode === "deactivate") {
+      res.json({ success: true, txHash, confirmed: true, explorerUrl: `${config.quaiscanBaseUrl}/tx/${txHash}` });
+      return;
+    }
+
+    const priceWei = price ? quais.parseQuai(price) : quais.parseQuai("0.0005");
+
+    if (userAddress && endpoint && capability) {
+      const { addAgent } = await import("./agentStore");
+      addAgent(userAddress, endpoint, capability, priceWei.toString(), "on-chain");
+    }
+
+    res.json({
+      success: true,
+      txHash,
+      confirmed: true,
+      explorerUrl: `${config.quaiscanBaseUrl}/tx/${txHash}`,
+      message: "Agent registered on-chain.",
+    });
+  } catch (err) { next(err); }
+});
+
+/**
  * POST /agent/:capability/run
  * Run a single agent for inference via Venice AI.
  */
@@ -492,6 +571,17 @@ app.post("/build", limiter, async (req: Request, res: Response, next: NextFuncti
  * Returns all persisted settlement records.
  */
 app.get("/settlements", async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const settlements = getSettlements();
+    res.json({ settlements, count: settlements.length });
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /x402/history
+ * Alias for /settlements — used by frontend dashboard & payments pages.
+ */
+app.get("/x402/history", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const settlements = getSettlements();
     res.json({ settlements, count: settlements.length });

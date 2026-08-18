@@ -270,11 +270,15 @@ async function completeTaskOnChain(
     );
     console.log(`[Coordinator] Task ${taskId} completed on-chain`);
 
-    // Update local reputation
+    // Update local reputation + record events
     for (const agent of agentsHired) {
       try {
         const { recordAgentCompletion } = await import("./agentStore");
         recordAgentCompletion(agent.accountHash);
+        const { recordReputationEvent } = await import("./reputation");
+        const { getAllAgents } = await import("./agentStore");
+        const updated = getAllAgents().find(a => a.accountHash === agent.accountHash);
+        recordReputationEvent(agent.accountHash, taskId.toString(), updated?.reputationScore ?? 5000, true);
       } catch {
         // Reputation update is non-critical
       }

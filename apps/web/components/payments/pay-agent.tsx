@@ -9,57 +9,37 @@ import { Loader2, CreditCard, ExternalLink, CheckCircle, AlertCircle } from "luc
 interface PayAgentProps {
   agentAccountHash: string;
   agentName: string;
-  amountMotes: string;
+  amountQuai: string;
   amountLabel: string;
   onSuccess?: (explorerLink: string) => void;
 }
 
-export function PayAgent({ agentAccountHash, agentName, amountMotes, amountLabel, onSuccess }: PayAgentProps) {
-  const { connected, address, connect, signTypedData } = useWallet();
+export function PayAgent({ agentAccountHash, agentName, amountQuai, amountLabel, onSuccess }: PayAgentProps) {
+  const { connected, connect } = useWallet();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; explorerLink?: string; error?: string } | null>(null);
 
   async function handlePay() {
-    if (!connected || !signTypedData) { connect(); return; }
+    if (!connected) { connect(); return; }
     setLoading(true);
     setResult(null);
 
     try {
-      // Step 1: Prepare payment
-      const prepRes = await fetch(`${BACKEND_URL}/x402/prepare`, {
+      const res = await fetch(`${BACKEND_URL}/payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          payeeAccountHash: agentAccountHash,
-          amountBaseUnits:  amountMotes,
-          resourceUrl:      `https://guildnet.io/agents/pay/${agentAccountHash}`,
+          to: agentAccountHash,
+          amount: amountQuai,
+          label: `payment-${agentName}`,
         }),
       });
-      if (!prepRes.ok) throw new Error(`Prepare failed: ${prepRes.status}`);
-      const prepData = await prepRes.json();
-
-      // Step 2: Sign via CSPR.click
-      const signed = await signTypedData(prepData.signTypedDataParams);
-      if (!signed || signed.cancelled || !signed.signatureHex) throw new Error("Signing was rejected or cancelled");
-
-      // Step 3: Submit signed payment
-      const submitRes = await fetch(`${BACKEND_URL}/x402/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          authorization: prepData.authorization,
-          signature:     signed.signatureHex,
-          publicKey:     address,
-          resourceUrl:   prepData.resourceUrl,
-        }),
-      });
-      if (!submitRes.ok) {
-        const err = await submitRes.json().catch(() => ({}));
-        throw new Error(err.error ?? `Submit failed: ${submitRes.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Payment failed: ${res.status}`);
       }
-      const submitData = await submitRes.json();
-
-      const link = submitData.explorerLink ?? `https://orchard.quaiscan.io/tx/${submitData.transactionHash}`;
+      const data = await res.json();
+      const link = data.explorerUrl ?? `https://orchard.quaiscan.io/tx/${data.txHash}`;
       setResult({ success: true, explorerLink: link });
       onSuccess?.(link);
     } catch (e) {

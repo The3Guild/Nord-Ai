@@ -78,7 +78,7 @@ export function TaskCreator({ onTaskComplete }: Props) {
       const ticker = setInterval(() => { si = Math.min(si + 1, pKeys.length - 1); setStep(pKeys[si]); }, 14_000);
       const res = await fetch(`${BACKEND_URL}/task`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, budgetCSPR: "4", capabilities: activeCaps }),
+        body: JSON.stringify({ description, capabilities: activeCaps }),
         signal: AbortSignal.timeout(300_000),
       });
       clearInterval(ticker);

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, ExternalLink, CheckCircle, AlertCircle, Loader2, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
-import { useClickRef } from "@/contexts/click-context";
 import { CONTRACTS, CAPABILITIES, BACKEND_URL, QUAI_EXPLORER } from "@/lib/constants";
 
 type Mode = "register" | "deactivate";
@@ -18,13 +17,11 @@ export default function RegisterPage() {
   const [loading,          setLoading]          = useState(false);
   const [deployHash,       setDeployHash]       = useState("");
   const [confirmed,        setConfirmed]        = useState(false);
-  const [onChainConfirmed, setOnChainConfirmed] = useState(false);
   const [error,      setError]      = useState("");
   const [verifying,  setVerifying]  = useState(false);
   const [verified,   setVerified]   = useState<{ ok: boolean; reason?: string } | null>(null);
 
-  const { connected, address, connect } = useWallet();
-  const { clickRef } = useClickRef();
+  const { connected, address, connect, sendTransaction } = useWallet();
   const router = useRouter();
 
   async function verifyEndpoint() {
@@ -47,42 +44,37 @@ export default function RegisterPage() {
     const cap = capability === "custom" ? customCap.trim().toLowerCase() : capability;
     if (mode === "register" && !cap) return;
 
-    setLoading(true); setError(""); setDeployHash(""); setConfirmed(false); setOnChainConfirmed(false);
+    setLoading(true); setError(""); setDeployHash(""); setConfirmed(false);
     try {
       const prepRes = await fetch(`${BACKEND_URL}/agent/register/prepare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, wallet: address, endpoint, capability: cap, price }),
+        body: JSON.stringify({ wallet: address, endpoint, capability: cap, price, mode }),
       });
       if (!prepRes.ok) {
         const err = await prepRes.json().catch(() => ({ error: prepRes.statusText }));
         throw new Error(err.error ?? prepRes.statusText);
       }
-      const { deployJSON } = await prepRes.json();
+      const { txData } = await prepRes.json();
 
-      if (!clickRef) throw new Error("Wallet not connected — reconnect your wallet");
-      const signResult = await clickRef.sign(deployJSON, address);
-      if (!signResult) throw new Error("No response from wallet — try again");
-      if (signResult.cancelled) throw new Error("Signing cancelled in wallet");
-      if (signResult.error) throw new Error(signResult.error);
-
-      const signedDeploy = signResult.deploy;
-      if (!signedDeploy) throw new Error("No signed deploy returned");
+      const txHash = await sendTransaction({
+        to: txData.to,
+        value: "0x0",
+        data: txData.data,
+      });
 
       const submitRes = await fetch(`${BACKEND_URL}/agent/register/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signedDeploy, endpoint, capability: cap, price }),
+        body: JSON.stringify({ txHash, endpoint, capability: cap, price, wallet: address, mode }),
       });
       if (!submitRes.ok) {
         const err = await submitRes.json().catch(() => ({ error: submitRes.statusText }));
         throw new Error(err.error ?? submitRes.statusText);
       }
-      const { deployHash: txHash, confirmed: txConfirmed } = await submitRes.json();
-      if (!txHash) throw new Error("No deploy hash returned");
-      setDeployHash(txHash);
+      const { txHash: confirmedHash } = await submitRes.json();
+      setDeployHash(confirmedHash ?? txHash);
       setConfirmed(true);
-      setOnChainConfirmed(txConfirmed === true);
       if (mode !== "deactivate") {
         setTimeout(() => router.push("/agents"), 1500);
       }
@@ -195,7 +187,7 @@ export default function RegisterPage() {
               <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-green-400">
-                  {confirmed ? (mode === "deactivate" ? "Agent removed!" : onChainConfirmed ? "Agent registered on-chain!" : "Deploy submitted — finalizing on-chain…") : "Deploy sent..."}
+                  {confirmed ? (mode === "deactivate" ? "Agent removed!" : "Agent registered on-chain!") : "Deploy submitted — finalizing…"}
                 </p>
                 <a href={`${QUAI_EXPLORER}/tx/${deployHash}`} target="_blank" rel="noreferrer"
                   className="text-xs text-cyan-400 hover:underline flex items-center gap-1 mt-1">
@@ -228,7 +220,7 @@ export default function RegisterPage() {
               <p className="text-[11px] text-slate-500">AgentRegistry</p>
               <code className="text-[10px] sm:text-[11px] text-cyan-400 truncate block max-w-[180px] sm:max-w-none">{CONTRACTS.AGENT_REGISTRY}</code>
             </div>
-            <a href={`${QUAI_EXPLORER}/contract/${CONTRACTS.AGENT_REGISTRY}`} target="_blank" rel="noreferrer"
+            <a href={`${QUAI_EXPLORER}/address/${CONTRACTS.AGENT_REGISTRY}`} target="_blank" rel="noreferrer"
               className="text-slate-500 hover:text-cyan-400 transition-colors flex-shrink-0 ml-3">
               <ExternalLink className="w-3.5 h-3.5" />
             </a>

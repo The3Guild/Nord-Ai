@@ -39,7 +39,7 @@ export function useChainAgents() {
           description: a.demo
             ? `Demo ${a.capability} agent on Nord-AI. Coordinator-seeded for testing.`
             : `Autonomous ${a.capability} agent on Nord-AI. ${a.tasksCompleted > 0 ? `${a.tasksCompleted} tasks completed.` : "Ready for hire."}${a.reputationScore != null ? ` Reputation: ${a.reputationScore}/10000.` : ""}`,
-          price: Number(a.pricePerTask) / 1e9,
+          price: Number(a.pricePerTask) / 1e18,
           rating: a.userRating ?? null,
           ratingCount: a.userRatingCount ?? 0,
           tasks:       a.tasksCompleted ?? 0,

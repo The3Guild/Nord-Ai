@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
-import type { SignTypedDataParams, SignTypedDataResult } from "@make-software/csprclick-core-types";
-import { useClickRef } from "@/contexts/click-context";
+import { useCallback, useState } from "react";
+import { usePelagus } from "@/contexts/click-context";
 
 interface WalletState {
   connected: boolean;
@@ -14,68 +13,44 @@ interface WalletState {
   connect: () => void;
   disconnect: () => void;
   copyAddress: () => void;
-  signTypedData: (params: SignTypedDataParams) => Promise<SignTypedDataResult | undefined>;
+  sendTransaction: (tx: { to: string; value: string; data?: string }) => Promise<string>;
 }
 
 export function useWallet(): WalletState {
-  const { publicKey, clickRef, ready, error: sdkError, signTypedData: clickSignTypedData } = useClickRef();
+  const { address, connected, ready, error: sdkError, connect: pelagusConnect, disconnect: pelagusDisconnect, sendTransaction } = usePelagus();
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  useEffect(() => {
-    return () => {
-      if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (connectTimeoutRef.current) {
-      clearTimeout(connectTimeoutRef.current);
-      connectTimeoutRef.current = undefined;
-    }
-  }, [publicKey, ready]);
-
-  const connect = useCallback(() => {
-    if (!clickRef) return;
+  const connect = useCallback(async () => {
     setConnecting(true);
-    connectTimeoutRef.current = setTimeout(() => setConnecting(false), 30000);
     try {
-      clickRef.signIn();
-    } catch {
+      await pelagusConnect();
+    } finally {
       setConnecting(false);
-      if (connectTimeoutRef.current) {
-        clearTimeout(connectTimeoutRef.current);
-        connectTimeoutRef.current = undefined;
-      }
     }
-  }, [clickRef]);
+  }, [pelagusConnect]);
 
   const disconnect = useCallback(() => {
-    try {
-      clickRef?.signOut();
-    } catch {
-      // Ignore disconnect errors
-    }
-  }, [clickRef]);
+    pelagusDisconnect();
+  }, [pelagusDisconnect]);
 
   const copyAddress = useCallback(() => {
-    if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey);
+    if (!address) return;
+    navigator.clipboard.writeText(address);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [publicKey]);
+  }, [address]);
 
   return {
-    connected: !!publicKey,
-    address: publicKey ?? "",
-    connecting: connecting && !publicKey,
+    connected,
+    address: address ?? "",
+    connecting: connecting && !connected,
     sdkReady: ready,
     error: sdkError,
     copied,
     connect,
     disconnect,
     copyAddress,
-    signTypedData: clickSignTypedData,
+    sendTransaction,
   };
 }

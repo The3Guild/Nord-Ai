@@ -1,140 +1,131 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type { ReactNode } from "react";
-import type {
-  AccountType,
-  ICSPRClickSDK,
-  SignTypedDataParams,
-  SignTypedDataResult,
-} from "@make-software/csprclick-core-types";
-import type { ClickUIOptions } from "@make-software/csprclick-core-types/clickui";
 
 declare global {
   interface Window {
-    clickUIOptions: ClickUIOptions;
-    clickSDKOptions: Record<string, unknown>;
-    csprclick?: ICSPRClickSDK;
+    quai?: {
+      isPelagus?: boolean;
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (event: string, handler: (...args: unknown[]) => void) => void;
+      removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
   }
 }
 
-interface ClickContextState {
-  publicKey: string | undefined;
-  provider: string | undefined;
-  clickRef: ICSPRClickSDK | undefined;
+interface WalletContextState {
+  address: string | undefined;
+  connected: boolean;
   ready: boolean;
   error: string | null;
-  signTypedData: (params: SignTypedDataParams) => Promise<SignTypedDataResult | undefined>;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  sendTransaction: (tx: { to: string; value: string; data?: string }) => Promise<string>;
+  signMessage: (message: string) => Promise<string>;
 }
 
-type AccountChangedEvent = {
-  account?: AccountType;
-};
+const WalletContext = createContext<WalletContextState | undefined>(undefined);
 
-const ClickContext = createContext<ClickContextState | undefined>(undefined);
-
-interface ClickProviderProps {
-  children: ReactNode;
-}
-
-const CSPR_CLICK_SCRIPT_ID = "csprclick-client";
-
-export function ClickProvider({ children }: ClickProviderProps) {
-  const [connectedAccount, setConnectedAccount] = useState<AccountType | undefined>();
-  const [clickRef, setClickRef] = useState<ICSPRClickSDK | undefined>();
+export function PelagusProvider({ children }: { children: ReactNode }) {
+  const [address, setAddress] = useState<string | undefined>();
+  const [connected, setConnected] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    const checkActiveAccount = async (ref: ICSPRClickSDK) => {
+    const provider = window.quai;
+    if (!provider) {
+      queueMicrotask(() => setReady(true));
+      return;
+    }
+
+    let cancelled = false;
+
+    async function checkConnection() {
       try {
-        const account = await ref.getActiveAccountAsync({
-          withBalance: true,
-        });
-        setConnectedAccount(account?.public_key ? account : undefined);
+        const accounts = await provider!.request({ method: "quai_accounts" }) as string[];
+        if (!cancelled && accounts && accounts.length > 0) {
+          setAddress(accounts[0]);
+          setConnected(true);
+        }
       } catch {
-        setConnectedAccount(undefined);
+        // Not connected
       }
-    };
-
-    const handleAccountChanged = (event: AccountChangedEvent) => {
-      setConnectedAccount(event.account?.public_key ? event.account : undefined);
-    };
-
-    const handleSdkLoaded = () => {
-      const ref = window.csprclick;
-      if (!ref) return;
-      setClickRef(ref);
-      setSdkLoaded(true);
-      setError(null);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = undefined;
-      }
-      ref.on("csprclick:signed_in", handleAccountChanged);
-      ref.on("csprclick:switched_account", handleAccountChanged);
-      ref.on("csprclick:unsolicited_account_change", handleAccountChanged);
-      ref.on("csprclick:signed_out", () => setConnectedAccount(undefined));
-      ref.on("csprclick:disconnected", () => setConnectedAccount(undefined));
-      checkActiveAccount(ref);
-    };
-
-    window.addEventListener("csprclick:loaded", handleSdkLoaded);
-
-    if (window.csprclick) {
-      handleSdkLoaded();
+      if (!cancelled) setReady(true);
     }
 
-    if (!document.querySelector(`script#${CSPR_CLICK_SCRIPT_ID}`)) {
-      const script = document.createElement("script");
-      script.src = "https://cdn.cspr.click/ui/v2.1.0/csprclick-client-2.1.0.js";
-      script.id = CSPR_CLICK_SCRIPT_ID;
-      script.async = true;
-      document.head.appendChild(script);
+    checkConnection();
+
+    function handleAccountsChanged(accounts: unknown) {
+      const accs = accounts as string[];
+      if (accs && accs.length > 0) {
+        setAddress(accs[0]);
+        setConnected(true);
+      } else {
+        setAddress(undefined);
+        setConnected(false);
+      }
     }
 
-    timeoutRef.current = setTimeout(() => {
-      if (!window.csprclick) {
-        setError("Wallet SDK failed to load — check your network or ad-blocker.");
-      }
-    }, 30000);
-
+    provider.on?.("accountsChanged", handleAccountsChanged);
     return () => {
-      window.removeEventListener("csprclick:loaded", handleSdkLoaded);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      provider.removeListener?.("accountsChanged", handleAccountsChanged);
     };
   }, []);
 
-  const signTypedData = useCallback(
-    async (params: SignTypedDataParams): Promise<SignTypedDataResult | undefined> => {
-      const pk = connectedAccount?.public_key;
-      if (!clickRef || !pk) return undefined;
-      return clickRef.signTypedData(params, pk);
-    },
-    [clickRef, connectedAccount]
-  );
+  const connect = useCallback(async () => {
+    const provider = window.quai;
+    if (!provider) {
+      setError("Pelagus wallet not detected. Install the Pelagus browser extension.");
+      return;
+    }
+    try {
+      setError(null);
+      const accounts = await provider.request({ method: "quai_requestAccounts" }) as string[];
+      if (accounts && accounts.length > 0) {
+        setAddress(accounts[0]);
+        setConnected(true);
+      }
+    } catch (e) {
+      setError((e as Error).message ?? "Failed to connect wallet");
+    }
+  }, []);
+
+  const disconnect = useCallback(() => {
+    setAddress(undefined);
+    setConnected(false);
+  }, []);
+
+  const sendTransaction = useCallback(async (tx: { to: string; value: string; data?: string }): Promise<string> => {
+    const provider = window.quai;
+    if (!provider) throw new Error("Pelagus not available");
+    const txHash = await provider.request({
+      method: "eth_sendTransaction",
+      params: [{ from: address, ...tx }],
+    });
+    return txHash as string;
+  }, [address]);
+
+  const signMessage = useCallback(async (message: string): Promise<string> => {
+    const provider = window.quai;
+    if (!provider) throw new Error("Pelagus not available");
+    const sig = await provider.request({
+      method: "personal_sign",
+      params: [message, address],
+    });
+    return sig as string;
+  }, [address]);
 
   return (
-    <ClickContext.Provider
-      value={{
-        publicKey: connectedAccount?.public_key,
-        provider: connectedAccount?.provider,
-        clickRef,
-        ready: sdkLoaded,
-        error,
-        signTypedData,
-      }}
-    >
+    <WalletContext.Provider value={{ address, connected, ready, error, connect, disconnect, sendTransaction, signMessage }}>
       {children}
-    </ClickContext.Provider>
+    </WalletContext.Provider>
   );
 }
 
-export function useClickRef(): ClickContextState {
-  const context = useContext(ClickContext);
-  if (!context) {
-    throw new Error("useClickRef must be used within a ClickProvider");
-  }
-  return context;
+export function usePelagus(): WalletContextState {
+  const ctx = useContext(WalletContext);
+  if (!ctx) throw new Error("usePelagus must be used within PelagusProvider");
+  return ctx;
 }
