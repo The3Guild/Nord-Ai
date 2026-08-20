@@ -1,11 +1,10 @@
 services:
   - type: web
     name: nord-ai-backend
-    runtime: node
+    runtime: docker
     region: oregon
     plan: free
-    buildCommand: cd backend && npm install && npm run build
-    startCommand: cd backend && node dist/server.js
+    dockerfilePath: Dockerfile.backend
     healthCheckPath: /health
     envVars:
       # ── Quai Network ──────────────────────────────────────────────────────
@@ -15,9 +14,6 @@ services:
         value: "15000"
       - key: QUAI_NETWORK_NAME
         value: orchard-testnet
-      # ── Node version ─────────────────────────────────────────────────────
-      - key: NODE_VERSION
-        value: "20"
       # ── Venice AI (set via Render dashboard) ──────────────────────────────
       - key: VENICE_API_KEY
         sync: false

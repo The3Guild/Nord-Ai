@@ -1,0 +1,21 @@
+node_modules
+dist
+data
+.env
+.env.local
+*.log
+.DS_Store
+
+# Root monorepo stuff
+apps
+packages
+agents
+contracts
+artifacts
+cache
+typechain-types
+test
+scripts
+hardhat.config.ts
+render.yaml
+.git
