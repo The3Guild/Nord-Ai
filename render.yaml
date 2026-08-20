@@ -4,9 +4,8 @@ services:
     runtime: node
     region: oregon
     plan: free
-    rootDir: backend
-    buildCommand: npm install && npm run build
-    startCommand: node dist/server.js
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && node dist/server.js
     healthCheckPath: /health
     envVars:
       # ── Quai Network ──────────────────────────────────────────────────────
