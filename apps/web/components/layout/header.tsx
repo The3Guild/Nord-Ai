@@ -26,7 +26,7 @@ export function Header({ onMenuClick, showMenuButton = true, showLogo = false }:
       {showLogo && (
         <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 mr-2 group">
           <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-white/10 group-hover:ring-cyan-500/30 transition-all">
-            <Image src="/nord_ai_logo_monogram.png" alt="Nord-AI" width={28} height={28} className="object-cover w-full h-full" />
+            <Image src="/logo/nord_ai_logo_monogram.png" alt="Nord-AI" width={28} height={28} className="object-cover w-full h-full" />
           </div>
           <span className="font-bold text-[14px] gradient-text hidden xs:inline">Nord-AI</span>
         </Link>

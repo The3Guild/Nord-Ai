@@ -200,7 +200,7 @@ export default function HomePage() {
             <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-cyan-400/30 to-violet-400/30 blur-md animate-[glow-ring_3s_ease-in-out_infinite]" />
             <div className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-2xl overflow-hidden ring-2 ring-white/10 shadow-2xl shadow-black/50 bg-[#0a0a14]">
               <Image
-                src="/nord_ai_logo_monogram.png"
+                src="/logo/nord_ai_logo_monogram.png"
                 alt="Nord-AI"
                 width={96}
                 height={96}
