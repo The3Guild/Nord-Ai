@@ -106,7 +106,7 @@ export function PelagusProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(async () => {
     const provider = window.quai;
     if (!provider) {
-      setError("Pelagus wallet not detected. Install the Pelagus browser extension.");
+      setError("No wallet detected. Install Pelagus or open in Blip.");
       return;
     }
     try {
@@ -128,7 +128,7 @@ export function PelagusProvider({ children }: { children: ReactNode }) {
 
   const sendTransaction = useCallback(async (tx: { to: string; value: string; data?: string }): Promise<string> => {
     const provider = window.quai;
-    if (!provider) throw new Error("Pelagus not available");
+    if (!provider) throw new Error("Wallet not available");
     const txHash = await provider.request({
       method: "eth_sendTransaction",
       params: [{ from: address, ...tx }],
@@ -138,7 +138,7 @@ export function PelagusProvider({ children }: { children: ReactNode }) {
 
   const signMessage = useCallback(async (message: string): Promise<string> => {
     const provider = window.quai;
-    if (!provider) throw new Error("Pelagus not available");
+    if (!provider) throw new Error("Wallet not available");
     const sig = await provider.request({
       method: "personal_sign",
       params: [message, address],
