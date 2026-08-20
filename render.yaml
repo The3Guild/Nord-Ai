@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: nord-ai-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      # ── Quai Network ──────────────────────────────────────────────────────
+      - key: QUAI_RPC_URL
+        value: https://orchard.rpc.quai.network/cyprus1
+      - key: QUAI_CHAIN_ID
+        value: "15000"
+      - key: QUAI_NETWORK_NAME
+        value: orchard-testnet
+      # ── Node version ─────────────────────────────────────────────────────
+      - key: NODE_VERSION
+        value: "20"
+      # ── Venice AI (set via Render dashboard) ──────────────────────────────
+      - key: VENICE_API_KEY
+        sync: false
+      - key: VENICE_BASE_URL
+        value: https://api.venice.ai/api/v1
+      # ── Contract addresses (set after deployment) ────────────────────────
+      - key: AGENT_REGISTRY_ADDRESS
+        sync: false
+      - key: AGENT_REPUTATION_ADDRESS
+        sync: false
+      - key: TASK_COORDINATOR_ADDRESS
+        sync: false
+      # ── Coordinator wallet (set via Render dashboard) ─────────────────────
+      - key: COORDINATOR_PRIVATE_KEY
+        sync: false
+      # ── CORS ─────────────────────────────────────────────────────────────
+      - key: ALLOWED_ORIGIN
+        value: https://nord-ai.vercel.app
+      # ── Task budget ──────────────────────────────────────────────────────
+      - key: TASK_BUDGET_QUAI
+        value: "0.5"
