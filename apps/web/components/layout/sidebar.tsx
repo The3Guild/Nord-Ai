@@ -27,7 +27,7 @@ export function Sidebar({ mobileOpen, onClose }: Props) {
       {/* Logo */}
       <div className={`flex items-center gap-3 px-4 h-14 border-b border-white/[0.05] flex-shrink-0 ${collapsed ? "justify-center" : ""}`}>
         <Link href="/" className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-white/10 hover:ring-cyan-500/30 transition-all">
-          <Image src="/logo.png" alt="Nord-AI" width={32} height={32} className="object-cover w-full h-full" />
+          <Image src="/logo/nord_ai_logo_monogram.png" alt="Nord-AI" width={32} height={32} className="object-cover w-full h-full" />
         </Link>
         {!collapsed && (
           <Link href="/" className="min-w-0">
