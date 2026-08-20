@@ -89,7 +89,10 @@ app.get("/agents/:address/reputation", async (req: Request, res: Response, next:
       getReputation(address, agentRecord),
       getReputationEvents(address),
     ]);
-    res.json({ reputation: rep, events });
+    res.json({
+      reputation: rep ? { ...rep, zone: agentRecord?.zone, capabilities: agentRecord?.capabilities } : null,
+      events,
+    });
   } catch (err) { next(err); }
 });
 
@@ -187,13 +190,14 @@ const designStore = new Map<string, string>();
 
 app.post("/task", limiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { description, capabilities } = req.body as {
+    const { description, capabilities, budgetQUAI } = req.body as {
       description: string;
       capabilities?: string[];
+      budgetQUAI?: string;
     };
     if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
 
-    const result = await runCoordinator(description, capabilities);
+    const result = await runCoordinator(description, capabilities, budgetQUAI);
 
     if (result.design) designStore.set(result.taskId.toString(), result.design);
 
@@ -209,6 +213,41 @@ app.post("/task", limiter, async (req: Request, res: Response, next: NextFunctio
       design:          result.design,
       audit:           result.audit,
       report:          result.report,
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /task/:taskId
+ * Read task status from the on-chain TaskCoordinator contract.
+ */
+app.get("/task/:taskId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const taskId = req.params.taskId;
+    const contract = new quais.Contract(
+      config.contracts.taskCoordinator,
+      [
+        "function getTask(uint256 _taskId) view returns (tuple(address requester, string capability, uint256 budget, address selectedAgent, uint256 zone, uint8 status, uint256 deadline, bytes32 resultHash))",
+        "function getTaskStatus(uint256 _taskId) view returns (uint8)",
+      ],
+      getProvider(),
+    );
+    const [task, status] = await Promise.all([
+      contract.getTask(taskId),
+      contract.getTaskStatus(taskId),
+    ]);
+    const statusNames = ["Created","Routed","Funded","Assigned","Executing","EvidenceSubmitted","Verified","Completed","Settled","Disputed","Resolved","Failed","Cancelled"];
+    res.json({
+      taskId,
+      requester: task.requester,
+      capability: task.capability,
+      budget: quais.formatQuai(task.budget),
+      selectedAgent: task.selectedAgent,
+      zone: Number(task.zone),
+      status: statusNames[Number(status)] ?? `Unknown(${status})`,
+      statusCode: Number(status),
+      deadline: Number(task.deadline),
+      resultHash: task.resultHash,
     });
   } catch (err) { next(err); }
 });
@@ -271,7 +310,7 @@ app.post("/agent/register", limiter, async (req: Request, res: Response, next: N
 
     // Store locally
     const { addAgent } = await import("./agentStore");
-    addAgent(address, endpoint, capability, priceWei.toString(), "on-chain");
+    addAgent(address, endpoint, capability, priceWei.toString(), "on-chain", zoneIndex, [capability]);
 
     res.json({
       success: true,
@@ -294,11 +333,11 @@ app.post("/agent/deactivate", limiter, async (req: Request, res: Response, next:
     const wallet = getCoordinatorWallet();
     const agentRegistry = new quais.Contract(
       config.contracts.agentRegistry,
-      ["function deactivate(address _agent)"],
+      ["function deactivateAgent(address _agent)"],
       wallet,
     );
 
-    const tx = await agentRegistry.deactivate(address);
+    const tx = await agentRegistry.deactivateAgent(address);
     const receipt = await tx.wait();
 
     res.json({
@@ -333,10 +372,10 @@ app.post("/agent/register/prepare", limiter, async (req: Request, res: Response,
     if (mode === "deactivate") {
       const agentRegistry = new quais.Contract(
         config.contracts.agentRegistry,
-        ["function deactivate(address _agent)"],
+        ["function deactivateAgent(address _agent)"],
         getProvider(),
       );
-      const txData = await agentRegistry.deactivate.populateTransaction(userAddress);
+      const txData = await agentRegistry.deactivateAgent.populateTransaction(userAddress);
       res.json({ txData, to: config.contracts.agentRegistry, mode: "deactivate" });
       return;
     }
@@ -375,7 +414,11 @@ app.post("/agent/register/submit", limiter, async (req: Request, res: Response, 
 
     if (userAddress && endpoint && capability) {
       const { addAgent } = await import("./agentStore");
-      addAgent(userAddress, endpoint, capability, priceWei.toString(), "on-chain");
+      const zoneMap: Record<string, number> = {
+        research: 0, rwa: 1, risk: 2, audit: 3, coding: 4, design: 4, report: 3,
+      };
+      const zoneIdx = zoneMap[capability] ?? 0;
+      addAgent(userAddress, endpoint, capability, priceWei.toString(), "on-chain", zoneIdx, [capability]);
     }
 
     res.json({

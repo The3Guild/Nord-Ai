@@ -8,6 +8,8 @@ export interface ReputationData {
   tasksFailed:    number;
   score:          number;
   lastUpdated:    number;
+  zone?:          number;
+  capabilities?:  string[];
 }
 
 export interface ReputationEvent {

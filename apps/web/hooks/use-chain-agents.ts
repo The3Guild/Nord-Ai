@@ -50,6 +50,8 @@ export function useChainAgents() {
           skills: SKILL_MAP[a.capability] ?? [a.capability],
           accountHash: a.accountHash ?? "",
           source: a.source ?? "local",
+          zone: a.zone,
+          capability: a.capability,
         }));
         setAgents(result);
       } catch (e) {

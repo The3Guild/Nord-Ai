@@ -19,6 +19,8 @@ export interface Agent {
   accountHash?: string;
   source?: "on-chain" | "local";
   demo?: boolean;
+  zone?: number;
+  capability?: string;
 }
 
 const GRADIENTS: Record<string, string> = {
@@ -32,6 +34,9 @@ const GRADIENTS: Record<string, string> = {
 const EMOJIS: Record<string, string> = {
   Research: "🔍", Risk: "⚠️", Coding: "💻", Design: "🎨", Report: "📄", Audit: "✅",
 };
+const ZONE_NAMES: Record<number, string> = {
+  0: "Research", 1: "RWA", 2: "Risk", 3: "Audit", 4: "Automation",
+};
 
 function getRepLevel(score: number) {
   if (score >= 8000) return { label: "Elite", cls: "rep-excellent", color: "text-emerald-400", badge: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" };
@@ -41,7 +46,7 @@ function getRepLevel(score: number) {
   return { label: "Poor", cls: "rep-bad", color: "text-red-400", badge: "bg-red-500/10 border-red-500/20 text-red-400" };
 }
 
-export function AgentCard({ name, type, description, price, rating, ratingCount, tasks, reputationScore, status, skills, accountHash, source, demo }: Agent) {
+export function AgentCard({ name, type, description, price, rating, ratingCount, tasks, reputationScore, status, skills, accountHash, source, demo, zone, capability }: Agent) {
   const gradient = GRADIENTS[type] ?? "from-cyan-500 to-violet-400";
   const emoji    = EMOJIS[type] ?? "🤖";
   const isOnline = status === "online";
@@ -72,6 +77,9 @@ export function AgentCard({ name, type, description, price, rating, ratingCount,
               )}
               {demo && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">demo</span>
+              )}
+              {zone != null && ZONE_NAMES[zone] && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-400 font-medium">{ZONE_NAMES[zone]}</span>
               )}
             </div>
           </div>

@@ -141,7 +141,10 @@ contract TaskCoordinator is OwnableLite, ReentrancyGuardLite {
     function acceptAssignment(uint256 _taskId) external {
         Task storage task = tasks[_taskId];
         _requireTaskExists(_taskId);
-        require(task.selectedAgent == msg.sender, "Only assigned agent");
+        require(
+            task.selectedAgent == msg.sender || task.requester == msg.sender,
+            "Only assigned agent or requester"
+        );
         require(task.status == TaskStatus.Assigned, "Invalid status");
         require(block.timestamp <= task.deadline, "Task expired");
 
@@ -154,7 +157,10 @@ contract TaskCoordinator is OwnableLite, ReentrancyGuardLite {
     function submitEvidence(uint256 _taskId, bytes32 _resultHash) external {
         Task storage task = tasks[_taskId];
         _requireTaskExists(_taskId);
-        require(task.selectedAgent == msg.sender, "Only assigned agent");
+        require(
+            task.selectedAgent == msg.sender || task.requester == msg.sender,
+            "Only assigned agent or requester"
+        );
         require(task.status == TaskStatus.Assigned || task.status == TaskStatus.Executing, "Invalid status");
         require(block.timestamp <= task.deadline, "Task expired");
         require(_resultHash != bytes32(0), "Empty result hash");

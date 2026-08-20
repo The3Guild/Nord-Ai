@@ -20,6 +20,7 @@ interface Props { onTaskComplete?: (task: TaskRecord) => void; }
 
 export function TaskCreator({ onTaskComplete }: Props) {
   const [description,  setDescription]  = useState("");
+  const [budgetQuai,   setBudgetQuai]   = useState("0.01");
   const [capabilities, setCapabilities] = useState<string[]>(["research", "risk", "audit", "report"]);
   const [autoMode,     setAutoMode]     = useState(true);
   const [suggesting,   setSuggesting]   = useState(false);
@@ -78,7 +79,7 @@ export function TaskCreator({ onTaskComplete }: Props) {
       const ticker = setInterval(() => { si = Math.min(si + 1, pKeys.length - 1); setStep(pKeys[si]); }, 14_000);
       const res = await fetch(`${BACKEND_URL}/task`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, capabilities: activeCaps }),
+        body: JSON.stringify({ description, capabilities: activeCaps, budgetQUAI: budgetQuai }),
         signal: AbortSignal.timeout(300_000),
       });
       clearInterval(ticker);
@@ -156,6 +157,15 @@ export function TaskCreator({ onTaskComplete }: Props) {
           </div>
         </div>
       )}
+
+      {/* Budget */}
+      <div>
+        <label className="text-xs text-slate-500 font-medium mb-1 block">Budget (QUAI)</label>
+        <input type="number" min="0.001" step="0.01" value={budgetQuai}
+          onChange={e => setBudgetQuai(e.target.value)}
+          disabled={busy}
+          className="w-full input-base px-3 py-2 text-sm" />
+      </div>
 
       {/* Input */}
       <div className="relative">

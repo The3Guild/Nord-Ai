@@ -2,23 +2,24 @@
  * coordinator.ts — NORD-AI orchestration loop (Quai Network)
  *
  * All on-chain interactions target deployed Quai Network contracts.
- * Agent payments use direct QUAI transfers from the coordinator wallet.
+ * Agent payments are handled by the contract's _settle() via completeTask().
  *
  * Flow per task (matches TaskCoordinator.sol lifecycle):
- *   1. createTask      — create task on-chain with capability, budget, zone
- *   2. discover agents  — query AgentRegistry (local cache)
- *   3. assignAgent     — call TaskCoordinator on Quai
- *   4. QUAI settle     — direct QUAI transfer to agent
- *   5. submitEvidence   — store result hash on-chain
- *   6. verifyTask      — requester confirms evidence
- *   7. completeTask    — triggers on-chain settlement and reputation update
+ *   1. createTask        — create task on-chain with capability, budget, zone
+ *   2. routeTask         — transition Created → Routed
+ *   3. discover agents   — query AgentRegistry (local cache)
+ *   4. assignAgent       — assign agent on Quai chain
+ *   5. acceptAssignment  — transition Assigned → Executing
+ *   6. AI agents run     — A2A HTTP or Venice AI fallback
+ *   7. submitEvidence    — store result hash on-chain
+ *   8. verifyTask        — requester confirms evidence
+ *   9. completeTask      — triggers on-chain settlement and reputation update
  */
 
 import crypto from "crypto";
 import { quais, parseQuai } from "quais";
 import { config } from "./config";
 import { getProvider, getCoordinatorWallet } from "./chain";
-import { settlePayment } from "./x402";
 import { veniceChat } from "./agents/venice";
 import { withRetry, waitForTx } from "./quaiHandler";
 import { addSettlement } from "./settlements";
@@ -32,7 +33,9 @@ import {
 
 const TASK_COORDINATOR_ABI = [
   "function createTask(string _capability, uint256 _budget, uint256 _zone) payable returns (uint256)",
+  "function routeTask(uint256 _taskId)",
   "function assignAgent(uint256 _taskId, address _agent)",
+  "function acceptAssignment(uint256 _taskId)",
   "function submitEvidence(uint256 _taskId, bytes32 _resultHash)",
   "function verifyTask(uint256 _taskId)",
   "function completeTask(uint256 _taskId)",
@@ -186,9 +189,9 @@ async function callAgent(
   return { output, viaAgent: false };
 }
 
-// ── assignAndPay: on-chain assign + QUAI payment ─────────────────────────────
+// ── assignAgent: on-chain assign + accept ─────────────────────────────────────
 
-async function assignAndPay(
+async function assignAgent(
   agent:     AgentRecord,
   taskId:    bigint,
   result:    TaskResult,
@@ -203,36 +206,23 @@ async function assignAndPay(
   result.agentsHired.push(agent.accountHash);
   result.explorerLinks.push(`${config.quaiscanBaseUrl}/tx/${assignHash}`);
 
-  // 2. Direct QUAI payment to agent
-  const amountQuai = (Number(agent.pricePerTask) / 1e18).toFixed(4) || config.taskBudgetQuai;
+  // 2. Accept assignment on behalf of agent (requester can call acceptAssignment)
+  //    Transitions Assigned → Executing
   try {
-    const settleResult = await settlePayment(
-      agent.accountHash,
-      amountQuai,
-      agent.capability,
+    await withRetry(
+      () => callContractWrite("acceptAssignment", [taskId]),
+      "acceptAssignment",
+      2,
+      3000,
     );
-    result.txHashes.push(settleResult.hash);
-    result.explorerLinks.push(`${config.quaiscanBaseUrl}/tx/${settleResult.hash}`);
-
-    // Persist settlement record
-    try {
-      addSettlement({
-        hash:       settleResult.hash,
-        from:       settleResult.from,
-        to:         settleResult.to,
-        amount:     settleResult.amount,
-        capability: agent.capability,
-        taskId:     String(taskId),
-      });
-    } catch (e) {
-      console.warn(`[Coordinator] Failed to persist settlement: ${e}`);
-    }
+    console.log(`[Coordinator] Assignment accepted for task ${taskId}`);
   } catch (err) {
-    console.warn(`[Coordinator] QUAI payment for ${agent.capability} failed (non-fatal): ${err}`);
+    console.warn(`[Coordinator] acceptAssignment failed (non-fatal): ${err}`);
   }
 }
 
 // ── Complete task on-chain: submitEvidence → verifyTask → completeTask ────────
+// completeTask triggers _settle() which pays the agent from the contract budget.
 
 async function completeTaskOnChain(
   taskId:       bigint,
@@ -261,16 +251,32 @@ async function completeTaskOnChain(
     );
     console.log(`[Coordinator] Task ${taskId} verified on-chain`);
 
-    // 3. Complete task — triggers internal settlement in the contract
-    await withRetry(
+    // 3. Complete task — triggers _settle() which pays agent from contract budget
+    const completeHash = await withRetry(
       () => callContractWrite("completeTask", [taskId]),
       "completeTask",
       2,
       3000,
     );
-    console.log(`[Coordinator] Task ${taskId} completed on-chain`);
+    console.log(`[Coordinator] Task ${taskId} completed on-chain → ${completeHash}`);
 
-    // Update local reputation + record events
+    // 4. Record settlement from on-chain _settle()
+    for (const agent of agentsHired) {
+      try {
+        addSettlement({
+          hash:       completeHash,
+          from:       config.contracts.taskCoordinator,
+          to:         agent.accountHash,
+          amount:     config.taskBudgetQuai,
+          capability: agent.capability,
+          taskId:     String(taskId),
+        });
+      } catch (e) {
+        console.warn(`[Coordinator] Failed to persist settlement: ${e}`);
+      }
+    }
+
+    // 5. Update local reputation + record events
     for (const agent of agentsHired) {
       try {
         const { recordAgentCompletion } = await import("./agentStore");
@@ -295,6 +301,7 @@ let _nextTaskId = 0n;
 export async function runCoordinator(
   taskDescription: string,
   capabilities: string[] = ["research", "risk", "audit", "report"],
+  budgetQUAI?: string,
 ): Promise<TaskResult> {
 
   const result: TaskResult = {
@@ -323,11 +330,12 @@ export async function runCoordinator(
   const zoneMap: Record<string, number> = {
     research: 0, rwa: 1, risk: 2, audit: 3, coding: 4, design: 4, report: 3,
   };
-  const zoneIndex = zoneMap[primaryCapability] ?? 0;
-  const budgetWei = parseQuai(config.taskBudgetQuai);
+  const zoneIndex = zoneMap[primaryCapability.toLowerCase()] ?? 0;
+  const taskBudgetQuai = budgetQUAI ?? config.taskBudgetQuai;
+  const budgetWei = parseQuai(taskBudgetQuai);
 
   try {
-    console.log(`[Coordinator] Creating task on Quai (capability: ${primaryCapability}, budget: ${config.taskBudgetQuai} QUAI, zone: ${zoneIndex})…`);
+    console.log(`[Coordinator] Creating task on Quai (capability: ${primaryCapability}, budget: ${taskBudgetQuai} QUAI, zone: ${zoneIndex})…`);
     const createHash = await withRetry(
       () => callContractWrite(
         "createTask",
@@ -342,6 +350,19 @@ export async function runCoordinator(
     onChain = true;
     result.onChain = true;
     console.log(`[Coordinator] Task ${TASK_ID} created on-chain → ${createHash}`);
+
+    // Route task to transition Created → Routed (required before assignAgent)
+    try {
+      await withRetry(
+        () => callContractWrite("routeTask", [TASK_ID]),
+        "routeTask",
+        2,
+        3000,
+      );
+      console.log(`[Coordinator] Task ${TASK_ID} routed on-chain`);
+    } catch (routeErr) {
+      console.warn(`[Coordinator] routeTask failed (non-fatal): ${routeErr}`);
+    }
   } catch (err) {
     console.warn(`[Coordinator] createTask failed — proceeding without on-chain task: ${err}`);
   }
@@ -374,14 +395,6 @@ export async function runCoordinator(
       else if (cap === "coding")  result.coding   = output;
       else if (cap === "design")  result.design   = output;
       else result.research = (result.research ?? "") + `\n\n[${cap.toUpperCase()}]\n${output}`;
-
-      if (agentMap[cap]) {
-        try {
-          await assignAndPay(agentMap[cap]!, TASK_ID, result);
-        } catch (err) {
-          console.warn(`[Coordinator] assignAndPay for ${cap} failed (non-fatal): ${err}`);
-        }
-      }
     }
   }
 
@@ -390,11 +403,6 @@ export async function runCoordinator(
     console.log("[Coordinator] Wave 2: risk");
     const { output } = await callAgent("risk", taskDescription, (result.research ?? "").slice(0, 1500), agentMap.risk);
     result.riskAnalysis = output;
-    if (agentMap.risk) {
-      try { await assignAndPay(agentMap.risk, TASK_ID, result); } catch (err) {
-        console.warn(`[Coordinator] assignAndPay risk failed (non-fatal): ${err}`);
-      }
-    }
   }
 
   // ── Wave 3: audit (depends on research + risk) ─────────────────────────────
@@ -404,11 +412,6 @@ export async function runCoordinator(
       .filter(Boolean).join("\n\n");
     const { output } = await callAgent("audit", taskDescription, ctx, agentMap.audit);
     result.audit = output;
-    if (agentMap.audit) {
-      try { await assignAndPay(agentMap.audit, TASK_ID, result); } catch (err) {
-        console.warn(`[Coordinator] assignAndPay audit failed (non-fatal): ${err}`);
-      }
-    }
   }
 
   // ── Wave 4: report (depends on all above) ──────────────────────────────────
@@ -418,19 +421,26 @@ export async function runCoordinator(
       .filter(Boolean).join("\n\n");
     const { output } = await callAgent("report", taskDescription, ctx, agentMap.report);
     result.report = output;
-    if (agentMap.report) {
-      try { await assignAndPay(agentMap.report, TASK_ID, result); } catch (err) {
-        console.warn(`[Coordinator] assignAndPay report failed (non-fatal): ${err}`);
-      }
+  }
+
+  // ── Assign primary agent on-chain (contract supports one agent per task) ───
+  // After all AI runs, assign the primary agent. This ensures the agent's zone
+  // matches the task zone set during createTask.
+  const primaryAgent = agentMap[primaryCapability];
+  if (primaryAgent && onChain) {
+    try {
+      await assignAgent(primaryAgent, TASK_ID, result);
+    } catch (err) {
+      console.warn(`[Coordinator] assignAgent for primary ${primaryCapability} failed (non-fatal): ${err}`);
     }
   }
 
   // ── Complete task on-chain — submitEvidence → verifyTask → completeTask ────
+  // Only the primary agent was assigned on-chain; others ran via Venice AI.
   if (onChain) {
     const resultHash = crypto.createHash("sha256").update(result.report).digest("hex");
-    const hiredAgentRecords = capabilities
-      .filter(c => agentMap[c])
-      .map(c => agentMap[c]!);
+    const primaryAgent = agentMap[primaryCapability];
+    const hiredAgentRecords = primaryAgent ? [primaryAgent] : [];
     await completeTaskOnChain(TASK_ID, resultHash, hiredAgentRecords);
   }
 

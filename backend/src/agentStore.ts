@@ -15,6 +15,8 @@ export interface AgentRecord {
   demo?:            boolean;
   userRating?:      number;
   userRatingCount?: number;
+  zone?:            number;   // Zone enum: 0=Research, 1=RWA, 2=Risk, 3=Audit, 4=Automation
+  capabilities?:    string[]; // Agent's capabilities array from on-chain registration
 }
 
 const STORE_PATH = path.resolve(__dirname, "..", "data", "agents.json");
@@ -75,6 +77,8 @@ export function addAgent(
   capability: string,
   priceWei: string,
   source: "on-chain" | "local" = "local",
+  zone?: number,
+  capabilities?: string[],
 ): void {
   loadLocal();
   if (!QUAI_ADDRESS_RE.test(address)) {
@@ -92,6 +96,8 @@ export function addAgent(
     tasksFailed: 0,
     lastUpdated: new Date().toISOString(),
     source,
+    zone,
+    capabilities,
   });
   saveLocal();
 }

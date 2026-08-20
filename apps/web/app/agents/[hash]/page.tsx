@@ -8,7 +8,7 @@ import { QUAI_EXPLORER, BACKEND_URL } from "@/lib/constants";
 import { shortenAddress } from "@/lib/utils";
 import {
   Shield, ExternalLink, CheckCircle, XCircle, Clock, ArrowLeft,
-  TrendingUp, Activity, Award, Star, Check,
+  TrendingUp, Activity, Award, Star, Check, Wrench,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -77,6 +77,10 @@ export default function AgentTrustPage() {
   const tasksFailed = reputation?.tasksFailed ?? 0;
   const totalTasks = tasksCompleted + tasksFailed;
   const successRate = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
+
+  const agentZone = (reputation as unknown as Record<string, unknown>)?.zone as number | undefined;
+  const agentCapabilities = (reputation as unknown as Record<string, unknown>)?.capabilities as string[] | undefined;
+  const ZONE_NAMES: Record<number, string> = { 0: "Research", 1: "RWA", 2: "Risk", 3: "Audit", 4: "Automation" };
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-5">
@@ -212,6 +216,29 @@ export default function AgentTrustPage() {
             <p className="text-[11px] text-slate-500 font-medium">{label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Capabilities & Zone */}
+      <div className="glass-card p-5">
+        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-cyan-400" />
+          Capabilities & Zone
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {agentZone != null && ZONE_NAMES[agentZone] && (
+            <span className="px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400">
+              Zone: {ZONE_NAMES[agentZone]}
+            </span>
+          )}
+          {(agentCapabilities ?? []).map(cap => (
+            <span key={cap} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 capitalize">
+              {cap}
+            </span>
+          ))}
+          {(!agentCapabilities || agentCapabilities.length === 0) && agentZone == null && (
+            <p className="text-xs text-slate-500">No capability data available.</p>
+          )}
+        </div>
       </div>
 
       {/* Event history */}
