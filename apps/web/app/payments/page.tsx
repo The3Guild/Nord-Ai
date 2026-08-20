@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "@/hooks/use-wallet";
-import { QUAI_EXPLORER, BACKEND_URL } from "@/lib/constants";
+import { QUAI_EXPLORER, BACKEND_URL, getBlipDeepLink } from "@/lib/constants";
 import { shortenAddress } from "@/lib/utils";
 import { ExternalLink, ArrowUpRight, ArrowDownLeft, Wallet, Receipt, Loader2, TrendingUp, Users, CreditCard } from "lucide-react";
 
@@ -17,7 +17,7 @@ interface Settlement {
 }
 
 export default function PaymentsPage() {
-  const { connected, address, connect } = useWallet();
+  const { connected, address, connect, isBlip } = useWallet();
   const [settlements, setSettlements]   = useState<Settlement[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
@@ -82,6 +82,30 @@ export default function PaymentsPage() {
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
+              {isBlip && (
+                <p className="text-[10px] text-emerald-400 mt-2 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Blip wallet connected
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Blip deep link card */}
+          {!isBlip && (
+            <div className="glass-card p-4 space-y-2">
+              <p className="text-[11px] text-slate-500">Pay from mobile</p>
+              <a
+                href={getBlipDeepLink(typeof window !== "undefined" ? window.location.href : "https://nord-ai.dev")}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-cyan-500/10 to-violet-500/10 border border-cyan-500/15 hover:border-cyan-500/30 transition-colors text-xs text-cyan-400"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                Open in Blip
+                <ExternalLink className="w-3 h-3 ml-auto" />
+              </a>
+              <p className="text-[10px] text-slate-600">Pay QUAI directly from the Blip wallet app</p>
             </div>
           )}
         </div>

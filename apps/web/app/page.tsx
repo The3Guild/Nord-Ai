@@ -149,11 +149,12 @@ const STATS = [
 
 import { useWallet } from "@/hooks/use-wallet";
 import { Wallet } from "lucide-react";
+import { getBlipDeepLink } from "@/lib/constants";
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const { connected, connect } = useWallet();
+  const { connected, connect, isBlip } = useWallet();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -215,7 +216,7 @@ export default function HomePage() {
             style={{ animationDelay: "200ms" }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Live on Quai Network
+            {isBlip ? "Running in Blip" : "Live on Quai Network"}
           </span>
 
           {/* Heading */}
@@ -266,12 +267,14 @@ export default function HomePage() {
                 >
                   <Wallet className="w-4 h-4" /> Connect Wallet to Enter
                 </button>
-                <button
-                  onClick={connect}
+                <a
+                  href={getBlipDeepLink(typeof window !== "undefined" ? window.location.href : "https://nord-ai.dev")}
+                  target="_blank"
+                  rel="noreferrer"
                   className="btn-ghost flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl w-full sm:w-auto text-sm font-medium"
                 >
-                  Launch App <ArrowRight className="w-4 h-4" />
-                </button>
+                  Open in Blip <ArrowRight className="w-4 h-4" />
+                </a>
               </>
             )}
           </div>
@@ -295,6 +298,16 @@ export default function HomePage() {
               <Layers className="w-3 h-3" />
               <span>Zone-aware routing</span>
             </div>
+            <div className="w-px h-3 bg-white/[0.06]" />
+            <a
+              href="https://blippay.me"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 text-[11px] text-slate-500 hover:text-cyan-400 transition-colors"
+            >
+              <Wallet className="w-3 h-3" />
+              <span>Blip Pay wallet</span>
+            </a>
           </div>
         </div>
 

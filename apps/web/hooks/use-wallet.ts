@@ -8,16 +8,23 @@ interface WalletState {
   address: string;
   connecting: boolean;
   sdkReady: boolean;
+  isBlip: boolean;
   error: string | null;
   copied: boolean;
   connect: () => void;
   disconnect: () => void;
   copyAddress: () => void;
   sendTransaction: (tx: { to: string; value: string; data?: string }) => Promise<string>;
+  requestAppWalletFunding: (params: {
+    chainId: string;
+    reason: string;
+    continueLabel: string;
+    assets: Array<{ type: "native" | "erc20"; symbol: string; decimals: number; amountWei: string; purpose: string; token?: string }>;
+  }) => Promise<{ funded: boolean; txHashes: string[]; balances: Record<string, string> }>;
 }
 
 export function useWallet(): WalletState {
-  const { address, connected, ready, error: sdkError, connect: pelagusConnect, disconnect: pelagusDisconnect, sendTransaction } = usePelagus();
+  const { address, connected, ready, isBlip, error: sdkError, connect: pelagusConnect, disconnect: pelagusDisconnect, sendTransaction, requestAppWalletFunding } = usePelagus();
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -46,11 +53,13 @@ export function useWallet(): WalletState {
     address: address ?? "",
     connecting: connecting && !connected,
     sdkReady: ready,
+    isBlip,
     error: sdkError,
     copied,
     connect,
     disconnect,
     copyAddress,
     sendTransaction,
+    requestAppWalletFunding,
   };
 }

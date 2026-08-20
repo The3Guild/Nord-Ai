@@ -15,8 +15,9 @@ interface PayAgentProps {
 }
 
 export function PayAgent({ agentAccountHash, agentName, amountQuai, amountLabel, onSuccess }: PayAgentProps) {
-  const { connected, connect } = useWallet();
+  const { connected, connect, isBlip, requestAppWalletFunding } = useWallet();
   const [loading, setLoading] = useState(false);
+  const [funding, setFunding] = useState(false);
   const [result, setResult] = useState<{ success: boolean; explorerLink?: string; error?: string } | null>(null);
 
   async function handlePay() {
@@ -25,6 +26,25 @@ export function PayAgent({ agentAccountHash, agentName, amountQuai, amountLabel,
     setResult(null);
 
     try {
+      if (isBlip) {
+        setFunding(true);
+        const amountWei = "0x" + (BigInt(Math.floor(parseFloat(amountQuai) * 1e18 * 1.1)).toString(16));
+        await requestAppWalletFunding({
+          chainId: "0x9",
+          reason: "agentPayment",
+          continueLabel: `Fund ${amountLabel} for ${agentName}`,
+          assets: [
+            {
+              type: "native",
+              symbol: "QUAI",
+              decimals: 18,
+              amountWei,
+              purpose: "agentPayment",
+            },
+          ],
+        });
+        setFunding(false);
+      }
       const res = await fetch(`${BACKEND_URL}/payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,11 +77,14 @@ export function PayAgent({ agentAccountHash, agentName, amountQuai, amountLabel,
         className="w-full btn-primary py-3 rounded-xl text-sm flex items-center justify-center gap-2"
       >
         {loading ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
+          <><Loader2 className="w-4 h-4 animate-spin" /> {funding ? "Funding via Blip…" : "Processing…"}</>
         ) : (
           <><CreditCard className="w-4 h-4" /> Pay {amountLabel} to {agentName}</>
         )}
       </button>
+      {isBlip && !loading && (
+        <p className="text-[10px] text-slate-500 text-center">Paying from Blip wallet — auto-funded</p>
+      )}
 
       {result?.success && result.explorerLink && (
         <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">

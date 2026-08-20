@@ -12,3 +12,9 @@ export const CAPABILITIES = ["research", "risk", "coding", "design", "audit", "r
 export type Capability = typeof CAPABILITIES[number];
 
 export const QUAI_EXPLORER = "https://orchard.quaiscan.io";
+
+export const BLIP_DEEP_LINK = "https://blippay.me/browser?url=";
+
+export function getBlipDeepLink(url: string): string {
+  return `${BLIP_DEEP_LINK}${encodeURIComponent(url)}`;
+}

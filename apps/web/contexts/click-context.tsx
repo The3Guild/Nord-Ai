@@ -7,6 +7,8 @@ declare global {
   interface Window {
     quai?: {
       isPelagus?: boolean;
+      isBlip?: boolean;
+      _isSwiftBlip?: boolean;
       request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
       on?: (event: string, handler: (...args: unknown[]) => void) => void;
       removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
@@ -14,15 +16,37 @@ declare global {
   }
 }
 
+interface AppWalletFundingParams {
+  chainId: string;
+  reason: string;
+  continueLabel: string;
+  assets: Array<{
+    type: "native" | "erc20";
+    symbol: string;
+    decimals: number;
+    amountWei: string;
+    purpose: string;
+    token?: string;
+  }>;
+}
+
+interface AppWalletFundingResult {
+  funded: boolean;
+  txHashes: string[];
+  balances: Record<string, string>;
+}
+
 interface WalletContextState {
   address: string | undefined;
   connected: boolean;
   ready: boolean;
+  isBlip: boolean;
   error: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   sendTransaction: (tx: { to: string; value: string; data?: string }) => Promise<string>;
   signMessage: (message: string) => Promise<string>;
+  requestAppWalletFunding: (params: AppWalletFundingParams) => Promise<AppWalletFundingResult>;
 }
 
 const WalletContext = createContext<WalletContextState | undefined>(undefined);
@@ -31,6 +55,11 @@ export function PelagusProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | undefined>();
   const [connected, setConnected] = useState(false);
   const [ready, setReady] = useState(false);
+  const [isBlip, setIsBlip] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const p = window.quai;
+    return !!(p && (p.isBlip || p._isSwiftBlip));
+  });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,8 +146,18 @@ export function PelagusProvider({ children }: { children: ReactNode }) {
     return sig as string;
   }, [address]);
 
+  const requestAppWalletFunding = useCallback(async (params: AppWalletFundingParams): Promise<AppWalletFundingResult> => {
+    const provider = window.quai;
+    if (!provider) throw new Error("Wallet not available");
+    const result = await provider.request({
+      method: "blip_requestAppWalletFunding",
+      params: [params],
+    });
+    return result as AppWalletFundingResult;
+  }, []);
+
   return (
-    <WalletContext.Provider value={{ address, connected, ready, error, connect, disconnect, sendTransaction, signMessage }}>
+    <WalletContext.Provider value={{ address, connected, ready, isBlip, error, connect, disconnect, sendTransaction, signMessage, requestAppWalletFunding }}>
       {children}
     </WalletContext.Provider>
   );
